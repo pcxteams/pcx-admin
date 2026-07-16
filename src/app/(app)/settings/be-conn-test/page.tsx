@@ -36,7 +36,7 @@ export default async function BeConnTestPage() {
             <div className="flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
               <span className="text-sm font-medium text-green-700">
-                Connected — HTTP {result.status}
+                Connected - HTTP {result.status}
               </span>
             </div>
             <p className="text-sm text-green-800 font-mono whitespace-pre-wrap">{result.body}</p>

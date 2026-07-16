@@ -1,7 +1,18 @@
 import type { NextConfig } from "next";
 
+const API_URL = process.env.API_URL ?? "http://localhost:3000";
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Proxy the Better Auth API to the NestJS backend so the session cookie is
+  // set first-party on this origin (like v2's httpOnly token cookie).
+  async rewrites() {
+    return [
+      {
+        source: "/api/auth/:path*",
+        destination: `${API_URL}/api/auth/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

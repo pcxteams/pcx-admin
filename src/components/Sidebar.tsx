@@ -1,14 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
   BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp,
-  Settings2, BookMarked, PlugZap, ChevronDown, type LucideIcon,
+  Settings2, BookMarked, PlugZap, ChevronDown, LogOut, type LucideIcon,
 } from 'lucide-react';
 import { navigation, type NavItem } from '@/lib/navigation';
+import { authClient } from '@/lib/auth-client';
+
+type SidebarUser = { name: string; email: string };
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
@@ -37,7 +40,24 @@ function NavLink({ item }: { item: NavItem }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ user }: { user?: SidebarUser }) {
+  const router = useRouter();
+
+  async function handleSignOut() {
+    // Navigate to /login regardless of outcome so the button is never a dead
+    // click on a network error. The proxy no longer bounces /login away, so a
+    // not-fully-cleared cookie still lands the user on the sign-in form.
+    try {
+      await authClient.signOut();
+    } finally {
+      router.replace('/login');
+      router.refresh();
+    }
+  }
+
+  const displayName = user?.name?.trim() || user?.email || 'Account';
+  const initial = displayName.charAt(0).toUpperCase();
+
   return (
     <aside className="w-56 bg-slate-900 h-screen flex flex-col flex-shrink-0 sticky top-0">
       {/* Brand */}
@@ -71,11 +91,23 @@ export default function Sidebar() {
       {/* User footer */}
       <div className="px-4 py-3 border-t border-slate-800 flex items-center gap-2.5">
         <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          J
+          {initial}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-slate-200 text-sm font-medium leading-tight truncate">Joe D.</div>
+          <div className="text-slate-200 text-sm font-medium leading-tight truncate">{displayName}</div>
+          {user?.email && (
+            <div className="text-slate-500 text-xs leading-tight truncate">{user.email}</div>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          title="Sign out"
+          aria-label="Sign out"
+          className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+        >
+          <LogOut size={15} />
+        </button>
       </div>
     </aside>
   );
