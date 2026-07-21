@@ -11,7 +11,7 @@ import {
 import { navigation, type NavItem } from '@/lib/navigation';
 import { authClient } from '@/lib/auth-client';
 
-type SidebarUser = { name: string; email: string };
+type SidebarUser = { name: string; email: string; role?: string | null };
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
@@ -74,18 +74,20 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-3">
-        {navigation.map((group) => (
-          <div key={group.section}>
-            <div className="px-5 mb-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
-              {group.section}
+        {navigation
+          .filter((group) => !group.requiredRole || group.requiredRole === user?.role)
+          .map((group) => (
+            <div key={group.section}>
+              <div className="px-5 mb-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+                {group.section}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </div>
             </div>
-            <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavLink key={item.href} item={item} />
-              ))}
-            </div>
-          </div>
-        ))}
+          ))}
       </nav>
 
       {/* User footer */}
