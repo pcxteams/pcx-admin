@@ -68,7 +68,7 @@ export const navigation: NavSection[] = [
   },
   {
     section: 'MASTER ADMIN',
-    requiredRole: 'master_admin',
+    requiredRole: 'master',
     items: [
       { label: 'Admin Panel', href: '/admin', icon: 'Settings' },
     ],
