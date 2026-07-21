@@ -9,6 +9,7 @@ export interface SessionUser {
   name: string;
   emailVerified: boolean;
   image?: string | null;
+  role?: string | null;
 }
 
 export interface Session {
