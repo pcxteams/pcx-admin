@@ -7,6 +7,7 @@ export type NavItem = {
 export type NavSection = {
   section: string;
   items: NavItem[];
+  requiredRole?: string;
 };
 
 export const navigation: NavSection[] = [
@@ -63,6 +64,13 @@ export const navigation: NavSection[] = [
       { label: 'Workspace Settings', href: '/settings/workspace', icon: 'Settings2' },
       { label: 'Leader Resources', href: '/settings/leader-resources', icon: 'BookMarked' },
       { label: 'BE Conn Test', href: '/settings/be-conn-test', icon: 'PlugZap' },
+    ],
+  },
+  {
+    section: 'MASTER ADMIN',
+    requiredRole: 'master_admin',
+    items: [
+      { label: 'Admin Panel', href: '/admin', icon: 'Settings' },
     ],
   },
 ];
