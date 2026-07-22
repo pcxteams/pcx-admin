@@ -60,17 +60,10 @@ export const navigation: NavSection[] = [
   },
   {
     section: 'SETTINGS',
+    requiredRole: 'master',
     items: [
       { label: 'Workspace Settings', href: '/settings/workspace', icon: 'Settings2' },
       { label: 'Leader Resources', href: '/settings/leader-resources', icon: 'BookMarked' },
-      { label: 'BE Conn Test', href: '/settings/be-conn-test', icon: 'PlugZap' },
-    ],
-  },
-  {
-    section: 'MASTER ADMIN',
-    requiredRole: 'master',
-    items: [
-      { label: 'Admin Panel', href: '/admin', icon: 'Settings' },
     ],
   },
 ];
