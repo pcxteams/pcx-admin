@@ -68,6 +68,9 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [emailBody, setEmailBody] = useState(DEFAULT_EMAIL_BODY);
   const [emailInput, setEmailInput] = useState('');
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -99,6 +102,48 @@ export default function AddWorkspaceModal({ onClose }: Props) {
 
   function removeRecipient(email: string) {
     setEmailRecipients((prev) => prev.filter((r) => r !== email));
+  }
+
+  async function handleSubmit() {
+    if (!workspaceName.trim() || !primaryName.trim() || !primaryEmail.trim()) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          workspaceName: workspaceName.trim(),
+          workspaceType,
+          primaryContactName: primaryName.trim(),
+          primaryContactEmail: primaryEmail.trim(),
+          managerName: managerName.trim() || undefined,
+          managerEmail: managerEmail.trim() || undefined,
+          reportsToWorkspaceId: reportsTo || undefined,
+          subscriptionPlan,
+          userCount,
+          cloneFrom,
+          cloneWorkspaceId: cloneFrom === 'existing' ? cloneWorkspaceId : undefined,
+          emailRecipients,
+          emailBody,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        setSubmitError(data.message ?? 'Something went wrong. Please try again.');
+        return;
+      }
+
+      onClose();
+    } catch {
+      setSubmitError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const fixedChipEmail = primaryEmail.trim() || 'email@domain.com';
@@ -410,18 +455,24 @@ export default function AddWorkspaceModal({ onClose }: Props) {
 
         {/* Sticky footer */}
         <div className="sticky bottom-0 z-10 bg-white border-t border-gray-100 px-6 py-4 flex items-center justify-end gap-3">
+          {submitError && (
+            <p className="flex-1 text-sm text-red-600">{submitError}</p>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+            disabled={isSubmitting}
+            className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
-            className="px-5 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors"
+            onClick={handleSubmit}
+            disabled={isSubmitting || !workspaceName.trim() || !primaryName.trim() || !primaryEmail.trim()}
+            className="px-5 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Create &amp; Send Form
+            {isSubmitting ? 'Creating…' : 'Create & Send Form'}
           </button>
         </div>
       </div>
