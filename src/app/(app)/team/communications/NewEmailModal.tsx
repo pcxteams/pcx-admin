@@ -141,11 +141,11 @@ export default function NewEmailModal({ onClose, onSent }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !sending) onClose();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, sending]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -240,7 +240,7 @@ export default function NewEmailModal({ onClose, onSent }: Props) {
         : recipients;
 
     const bodyText = editorRef.current?.innerText.trim() ?? '';
-    const bodyHtml = editorRef.current?.innerHTML ?? '';
+    const bodyHtml = sanitizePreview(editorRef.current?.innerHTML ?? '');
 
     if (!subject.trim()) return setError('A subject line is required.');
     if (!bodyText) return setError('A message body is required.');
@@ -287,7 +287,7 @@ export default function NewEmailModal({ onClose, onSent }: Props) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !sending) onClose();
       }}
     >
       <div className="relative flex max-h-[92vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
@@ -427,9 +427,9 @@ export default function NewEmailModal({ onClose, onSent }: Props) {
             {open.merge && (
               <div className="mt-3">
                 <p className="mb-2 text-sm text-gray-500">
-                  Insert a token into the subject or body. Personalization is
-                  filled per-recipient once the workspace model lands; tokens are
-                  sent literally until then.
+                  Insert a token into the body, or type one directly into the
+                  subject line. Personalization is filled per-recipient once the
+                  workspace model lands; tokens are sent literally until then.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {MERGE_FIELDS.map((token) => (
