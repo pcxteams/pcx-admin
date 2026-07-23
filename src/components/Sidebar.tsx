@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
@@ -42,6 +43,20 @@ function NavLink({ item }: { item: NavItem }) {
 
 export default function Sidebar({ user }: { user?: SidebarUser }) {
   const router = useRouter();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userRef = useRef<HTMLDivElement>(null);
+
+  // Close the account menu when clicking anywhere outside it. Mirrors v2's
+  // footer dropdown behavior.
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (userRef.current && !userRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
 
   async function handleSignOut() {
     // Navigate to /login regardless of outcome so the button is never a dead
@@ -73,7 +88,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 space-y-3">
+      <nav className="flex-1 overflow-y-auto py-3 space-y-3 sidebar-scroll">
         {navigation
           .filter((group) => !group.requiredRole || group.requiredRole === user?.role)
           .map((group) => (
@@ -91,24 +106,41 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       </nav>
 
       {/* User footer */}
-      <div className="px-4 py-3 border-t border-slate-800 flex items-center gap-2.5">
-        <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          {initial}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-slate-200 text-sm font-medium leading-tight truncate">{displayName}</div>
-          {user?.email && (
-            <div className="text-slate-500 text-xs leading-tight truncate">{user.email}</div>
-          )}
-        </div>
+      <div ref={userRef} className="relative flex-shrink-0 border-t border-slate-800 px-3 py-3">
+        {userMenuOpen && (
+          <div className="absolute bottom-full left-3 right-3 mb-2 z-50 rounded-xl border border-slate-700 bg-slate-800 p-1.5 shadow-2xl shadow-black/50">
+            {user?.email && (
+              <div className="px-3 pt-1.5 pb-2 mb-1 border-b border-slate-700">
+                <div className="text-slate-200 text-sm font-medium truncate">{displayName}</div>
+                <div className="text-slate-500 text-xs truncate">{user.email}</div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-slate-400 hover:text-slate-100 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors"
+            >
+              <LogOut size={15} className="flex-shrink-0" />
+              Sign out
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={handleSignOut}
-          title="Sign out"
-          aria-label="Sign out"
-          className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+          onClick={() => setUserMenuOpen((o) => !o)}
+          className="flex items-center gap-2.5 w-full rounded-lg px-2 py-2 hover:bg-slate-800 transition-colors cursor-pointer"
         >
-          <LogOut size={15} />
+          <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {initial}
+          </div>
+          <span className="flex-1 min-w-0 text-left text-slate-200 text-sm font-medium truncate">
+            {displayName}
+          </span>
+          <ChevronDown
+            size={13}
+            className={`text-slate-500 flex-shrink-0 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+          />
         </button>
       </div>
     </aside>
