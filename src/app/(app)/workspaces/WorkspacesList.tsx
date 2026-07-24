@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X } from 'lucide-react';
+import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, CheckCircle } from 'lucide-react';
+import WorkspaceSubmissionModal from './WorkspaceSubmissionModal';
 
 interface PendingWorkspace {
   id: string;
@@ -13,6 +14,8 @@ interface PendingWorkspace {
   primaryContactName: string;
   primaryContactEmail: string;
   setupToken: string | null;
+  reportsToName: string | null;
+  cloneSourceName: string | null;
 }
 
 interface ActiveWorkspace {
@@ -107,12 +110,39 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [submissionTarget, setSubmissionTarget] = useState<PendingWorkspace | null>(null);
+  const [activateTarget, setActivateTarget] = useState<PendingWorkspace | null>(null);
+  const [isActivating, setIsActivating] = useState(false);
+  const [activateError, setActivateError] = useState<string | null>(null);
 
   async function copySetupLink(workspaceId: string, token: string) {
     const url = `${window.location.origin}/setup/${token}`;
     await navigator.clipboard.writeText(url);
     setCopiedId(workspaceId);
     setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function handleActivate() {
+    if (!activateTarget) return;
+    setIsActivating(true);
+    setActivateError(null);
+    try {
+      const res = await fetch(`/api/workspaces/${activateTarget.id}/activate`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        setActivateError(data.message ?? 'Something went wrong. Please try again.');
+        return;
+      }
+      setActivateTarget(null);
+      router.refresh();
+    } catch {
+      setActivateError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsActivating(false);
+    }
   }
 
   async function handleDelete() {
@@ -209,12 +239,17 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                     <td className={TD}>
                       {w.status === 'setup_submitted' ? (
                         <div className="flex items-center gap-2">
-                          <button type="button" className="text-xs text-gray-500 hover:text-gray-700">
+                          <button
+                            type="button"
+                            className="text-xs text-gray-500 hover:text-gray-700"
+                            onClick={() => setSubmissionTarget(w)}
+                          >
                             View Submission
                           </button>
                           <button
                             type="button"
                             className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-medium hover:bg-teal-700 transition-colors"
+                            onClick={() => { setActivateTarget(w); setActivateError(null); }}
                           >
                             Complete Setup
                           </button>
@@ -344,6 +379,106 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
           </div>
         )}
       </div>
+
+      {/* View Submission modal */}
+      {submissionTarget && (
+        <WorkspaceSubmissionModal
+          workspaceId={submissionTarget.id}
+          workspaceName={submissionTarget.name}
+          onClose={() => setSubmissionTarget(null)}
+          onSaved={() => { setSubmissionTarget(null); router.refresh(); }}
+        />
+      )}
+
+      {/* Complete Setup confirmation modal */}
+      {activateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="px-6 pt-6 pb-5">
+              <button
+                type="button"
+                onClick={() => { setActivateTarget(null); setActivateError(null); }}
+                disabled={isActivating}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 disabled:opacity-40"
+              >
+                <X size={18} />
+              </button>
+
+              <h2 className="text-base font-semibold text-gray-900">Complete Setup</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Review and confirm before activating this workspace.</p>
+
+              {/* Workspace card */}
+              <div className="mt-5 flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3.5">
+                <div className="flex items-center justify-center w-9 h-9 rounded-full bg-teal-100 text-teal-700 text-sm font-semibold shrink-0">
+                  {activateTarget.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{activateTarget.name}</p>
+                  <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                    {activateTarget.type === 'office' ? <Building2 size={9} /> : <Users size={9} />}
+                    {activateTarget.type === 'office' ? 'Office' : 'Team'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Info rows */}
+              <div className="mt-4 space-y-2.5">
+                {[
+                  { label: 'Primary Contact', value: activateTarget.primaryContactName },
+                  { label: 'Contact Email',   value: activateTarget.primaryContactEmail },
+                  ...(activateTarget.reportsToName
+                    ? [{ label: 'Reports To', value: activateTarget.reportsToName }]
+                    : []),
+                  ...(activateTarget.cloneSourceName
+                    ? [{ label: 'Clone Source', value: activateTarget.cloneSourceName }]
+                    : []),
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-gray-500 shrink-0">{label}</span>
+                    <span className="font-medium text-gray-900 text-right truncate">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Warning */}
+              <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+                <AlertTriangle size={15} className="text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700">
+                  This will mark the workspace as <span className="font-semibold">Complete</span> and move it into Active Workspaces. This action cannot be undone.
+                </p>
+              </div>
+
+              {activateError && (
+                <p className="mt-3 text-sm text-red-600">{activateError}</p>
+              )}
+            </div>
+
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setActivateTarget(null); setActivateError(null); }}
+                disabled={isActivating}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleActivate}
+                disabled={isActivating}
+                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isActivating ? 'Activating…' : (
+                  <>
+                    <CheckCircle size={14} />
+                    Complete Setup
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {deleteTarget && (
