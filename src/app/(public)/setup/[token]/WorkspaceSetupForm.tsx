@@ -82,15 +82,13 @@ function ColorInput({ label, value, onChange }: { label: string; value: string; 
 function LeaderCard({
   leader,
   index,
-  isPrimary,
   onChange,
   onRemove,
 }: {
   leader: Leader;
   index: number;
-  isPrimary: boolean;
   onChange: (patch: Partial<Leader>) => void;
-  onRemove?: () => void;
+  onRemove: () => void;
 }) {
   return (
     <div className="rounded-xl border border-gray-200 p-4">
@@ -98,11 +96,9 @@ function LeaderCard({
         <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
           Leader {index + 1}
         </span>
-        {!isPrimary && onRemove && (
-          <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600">
-            <X size={15} />
-          </button>
-        )}
+        <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600">
+          <X size={15} />
+        </button>
       </div>
 
       <div className="space-y-3">
@@ -113,7 +109,6 @@ function LeaderCard({
               type="text"
               value={leader.name}
               onChange={(e) => onChange({ name: e.target.value })}
-              disabled={isPrimary}
               placeholder="Full name"
               className={INPUT}
             />
@@ -123,7 +118,8 @@ function LeaderCard({
             <input
               type="email"
               value={leader.email}
-              disabled
+              onChange={(e) => onChange({ email: e.target.value })}
+              placeholder="leader@example.com"
               className={INPUT}
             />
           </div>
@@ -160,8 +156,8 @@ function LeaderCard({
               onChange={(e) => onChange({ role: e.target.value as Leader['role'] })}
               className={INPUT}
             >
-              <option value="manager">Workspace Manager</option>
               <option value="leader">Leader</option>
+              <option value="manager">Workspace Manager</option>
             </select>
           </div>
           <div>
@@ -227,22 +223,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
   const [secondaryColor, setSecondaryColor] = useState('#6366f1');
   const [address, setAddress] = useState('');
   const [website, setWebsite] = useState('');
-  const [emailSenderName, setEmailSenderName] = useState(prefill.workspaceName);
-  const [senderEmail, setSenderEmail] = useState('');
-  const [customDomainUrl, setCustomDomainUrl] = useState('');
-  const [leaders, setLeaders] = useState<Leader[]>([
-    {
-      _key: `${uid}-0`,
-      name: prefill.primaryContactName,
-      email: prefill.primaryContactEmail,
-      phone: '',
-      jobTitle: '',
-      role: 'manager',
-      canEditSettings: true,
-      visibilityScope: 'workspace',
-      showProfile: true,
-    },
-  ]);
+  const [leaders, setLeaders] = useState<Leader[]>([]);
   const [mlsWebsite, setMlsWebsite] = useState('');
   const [boardOfRealtorsWebsite, setBoardOfRealtorsWebsite] = useState('');
   const [trainingCalendarUrl, setTrainingCalendarUrl] = useState('');
@@ -297,13 +278,13 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
       setSubmitError('Client-Facing Company Name is required.');
       return;
     }
-    if (!emailSenderName.trim() || !senderEmail.trim()) {
-      setSubmitError('Email Sender Name and Sender Email Address are required.');
-      return;
-    }
     for (const [i, leader] of leaders.entries()) {
       if (!leader.name.trim()) {
         setSubmitError(`Leader ${i + 1}: Name is required.`);
+        return;
+      }
+      if (!leader.email.trim()) {
+        setSubmitError(`Leader ${i + 1}: Email is required.`);
         return;
       }
     }
@@ -320,12 +301,9 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
           secondaryColor: secondaryColor || undefined,
           address: address.trim() || undefined,
           website: website.trim() || undefined,
-          emailSenderName: emailSenderName.trim(),
-          senderEmail: senderEmail.trim(),
-          customDomainUrl: customDomainUrl.trim() || undefined,
           leaders: leaders.map((l) => ({
             name: l.name.trim(),
-            email: l.email,
+            email: l.email.trim(),
             phone: l.phone.trim() || undefined,
             jobTitle: l.jobTitle.trim() || undefined,
             role: l.role,
@@ -475,60 +453,12 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
           </div>
         </div>
 
-        {/* Section 3 — Email Settings */}
+        {/* Section 3 — Leadership Team */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <SectionHeader
             n={3}
-            title="Email Settings"
-            subtitle="These settings are used for all Workspace-generated emails."
-          />
-          <div className="space-y-4">
-            <div>
-              <label className={LABEL}>
-                Email Sender Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={emailSenderName}
-                onChange={(e) => setEmailSenderName(e.target.value)}
-                placeholder="e.g. Mesa Valley Realty"
-                className={INPUT}
-              />
-            </div>
-            <div>
-              <label className={LABEL}>
-                Sender Email Address <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                value={senderEmail}
-                onChange={(e) => setSenderEmail(e.target.value)}
-                placeholder="noreply@yourdomain.com"
-                className={INPUT}
-              />
-            </div>
-            <div>
-              <label className={LABEL}>Custom Domain URL (Optional)</label>
-              <input
-                type="text"
-                value={customDomainUrl}
-                onChange={(e) => setCustomDomainUrl(e.target.value)}
-                placeholder="app.mybrokerage.com"
-                className={INPUT}
-              />
-              <p className="mt-1 text-xs text-gray-400">
-                Examples: learning@mybrokerage.com · coaching@myteam.com · app.mybrokerage.com
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 4 — Leadership Team */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <SectionHeader
-            n={4}
             title="Leadership Team"
-            subtitle="Add the initial leadership users for this Workspace."
+            subtitle="Register the workspace leaders who will be invited to access this workspace."
           />
           <div className="space-y-3">
             {leaders.map((leader, i) => (
@@ -536,9 +466,8 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 key={leader._key}
                 leader={leader}
                 index={i}
-                isPrimary={i === 0}
                 onChange={(patch) => updateLeader(i, patch)}
-                onRemove={i > 0 ? () => removeLeader(i) : undefined}
+                onRemove={() => removeLeader(i)}
               />
             ))}
             <button
@@ -552,10 +481,10 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
           </div>
         </div>
 
-        {/* Section 5 — Resources & Quick Links */}
+        {/* Section 4 — Resources & Quick Links */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <SectionHeader
-            n={5}
+            n={4}
             title="Office Resources & Quick Links"
             subtitle="Configure the default office resources available to agents."
           />
@@ -668,7 +597,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
               {isSubmitting ? 'Submitting…' : (
                 <>
                   <CheckCircle size={14} />
-                  Create Workspace
+                  Submit
                 </>
               )}
             </button>

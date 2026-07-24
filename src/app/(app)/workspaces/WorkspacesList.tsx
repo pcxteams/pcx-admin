@@ -12,6 +12,7 @@ interface PendingWorkspace {
   formSentAt: string | null;
   primaryContactName: string;
   primaryContactEmail: string;
+  setupToken: string | null;
 }
 
 interface ActiveWorkspace {
@@ -105,6 +106,14 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copySetupLink(workspaceId: string, token: string) {
+    const url = `${window.location.origin}/setup/${token}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedId(workspaceId);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -224,9 +233,15 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                           >
                             Delete
                           </button>
-                          <button type="button" className="text-xs text-gray-500 hover:text-gray-700">
-                            Copy Link
-                          </button>
+                          {(w.status === 'setup_sent' || w.status === 'setup_viewed') && w.setupToken && (
+                            <button
+                              type="button"
+                              className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                              onClick={() => copySetupLink(w.id, w.setupToken!)}
+                            >
+                              {copiedId === w.id ? 'Copied!' : 'Copy Link'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
