@@ -58,8 +58,6 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [workspaceType, setWorkspaceType] = useState<'office' | 'team'>('office');
   const [primaryName, setPrimaryName] = useState('');
   const [primaryEmail, setPrimaryEmail] = useState('');
-  const [managerName, setManagerName] = useState('');
-  const [managerEmail, setManagerEmail] = useState('');
   const [reportsTo, setReportsTo] = useState('');
   const [subscriptionPlan, setSubscriptionPlan] = useState<'essentials' | 'pro'>('essentials');
   const [userCount, setUserCount] = useState('1-10');
@@ -122,8 +120,6 @@ export default function AddWorkspaceModal({ onClose }: Props) {
           workspaceType,
           primaryContactName: primaryName.trim(),
           primaryContactEmail: primaryEmail.trim(),
-          managerName: managerName.trim() || undefined,
-          managerEmail: managerEmail.trim() || undefined,
           reportsToWorkspaceId: reportsTo || undefined,
           subscriptionPlan,
           userCount,
@@ -246,33 +242,6 @@ export default function AddWorkspaceModal({ onClose }: Props) {
                   type="email"
                   value={primaryEmail}
                   onChange={(e) => setPrimaryEmail(e.target.value)}
-                  placeholder="email@domain.com"
-                  className={INPUT_CLASS}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Workspace Manager */}
-          <div>
-            <p className={SECTION_LABEL_CLASS}>Workspace Manager (optional)</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={LABEL_CLASS}>Name</label>
-                <input
-                  type="text"
-                  value={managerName}
-                  onChange={(e) => setManagerName(e.target.value)}
-                  placeholder="Full name"
-                  className={INPUT_CLASS}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLASS}>Email</label>
-                <input
-                  type="email"
-                  value={managerEmail}
-                  onChange={(e) => setManagerEmail(e.target.value)}
                   placeholder="email@domain.com"
                   className={INPUT_CLASS}
                 />
