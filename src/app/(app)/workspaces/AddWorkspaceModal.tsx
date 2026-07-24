@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { X, LayoutGrid, Users, Info } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -68,6 +69,7 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [emailBody, setEmailBody] = useState(DEFAULT_EMAIL_BODY);
   const [emailInput, setEmailInput] = useState('');
 
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -139,6 +141,7 @@ export default function AddWorkspaceModal({ onClose }: Props) {
       }
 
       onClose();
+      router.refresh();
     } catch {
       setSubmitError('Network error. Please check your connection and try again.');
     } finally {
