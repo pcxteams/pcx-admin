@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X } from 'lucide-react';
 
 interface PendingWorkspace {
   id: string;
@@ -89,10 +90,44 @@ function formatDate(val: string | null): string {
   return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+interface DeleteTarget {
+  id: string;
+  name: string;
+  primaryContactName: string;
+  primaryContactEmail: string;
+}
+
 export default function WorkspacesList({ data }: { data: WorkspacesData }) {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [planFilter, setPlanFilter] = useState('all');
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/workspaces/${deleteTarget.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        setDeleteError(data.message ?? 'Something went wrong. Please try again.');
+        return;
+      }
+      setDeleteTarget(null);
+      router.refresh();
+    } catch {
+      setDeleteError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   const filteredActive = data.active.filter((w) => {
     const matchesSearch =
@@ -177,7 +212,16 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <button type="button" className="text-xs text-red-500 hover:text-red-700">
+                          <button
+                            type="button"
+                            className="text-xs text-red-500 hover:text-red-700"
+                            onClick={() => setDeleteTarget({
+                              id: w.id,
+                              name: w.name,
+                              primaryContactName: w.primaryContactName,
+                              primaryContactEmail: w.primaryContactEmail,
+                            })}
+                          >
                             Delete
                           </button>
                           <button type="button" className="text-xs text-gray-500 hover:text-gray-700">
@@ -285,6 +329,78 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="px-6 pt-6 pb-5">
+              {/* Header */}
+              <div className="flex items-start gap-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 shrink-0">
+                  <AlertTriangle size={18} className="text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900">Delete workspace?</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">This action is permanent and cannot be undone.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                  disabled={isDeleting}
+                  className="text-gray-400 hover:text-gray-600 transition-colors shrink-0 disabled:opacity-40"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Workspace info */}
+              <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3.5">
+                <p className="text-sm font-medium text-gray-900">{deleteTarget.name}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-[10px] font-semibold shrink-0">
+                    {deleteTarget.primaryContactName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm text-gray-700">{deleteTarget.primaryContactName}</span>
+                    <span className="text-xs text-gray-400 ml-1.5">{deleteTarget.primaryContactEmail}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <p className="mt-3.5 text-sm text-gray-500">
+                The user account associated with this workspace will also be permanently deleted.
+              </p>
+
+              {/* Error */}
+              {deleteError && (
+                <p className="mt-3 text-sm text-red-600">{deleteError}</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
