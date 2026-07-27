@@ -32,7 +32,18 @@ interface AdditionalLink {
 }
 
 const INPUT = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500';
+const INPUT_ERROR = 'w-full rounded-lg border border-red-400 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent';
 const LABEL = 'block text-xs font-medium text-gray-700 mb-1';
+
+function isValidUrl(value: string): boolean {
+  if (!value.trim()) return true;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'https:' && u.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
 
 const TIMEZONES = [
   { value: 'America/New_York',    label: 'America/New York (EST/EDT)' },
@@ -230,9 +241,25 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
   const [googleDriveUrl, setGoogleDriveUrl] = useState('');
   const [additionalLinks, setAdditionalLinks] = useState<AdditionalLink[]>([]);
 
+  const [urlErrors, setUrlErrors] = useState<Record<string, string>>({});
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  function validateUrl(key: string, value: string) {
+    setUrlErrors((prev) => {
+      if (!value.trim() || isValidUrl(value)) {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [key]: 'Must be a valid https:// URL' };
+    });
+  }
+
+  function urlInputClass(key: string) {
+    return urlErrors[key] ? INPUT_ERROR : INPUT;
+  }
 
   function addLeader() {
     setLeaders((prev) => [
@@ -287,6 +314,26 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         setSubmitError(`Leader ${i + 1}: Email is required.`);
         return;
       }
+    }
+
+    const urlFields: [string, string][] = [
+      ['website', website],
+      ['mlsWebsite', mlsWebsite],
+      ['boardOfRealtorsWebsite', boardOfRealtorsWebsite],
+      ['trainingCalendarUrl', trainingCalendarUrl],
+      ['googleDriveUrl', googleDriveUrl],
+      ...additionalLinks.map((l): [string, string] => [`additionalLink-${l._key}`, l.url]),
+    ];
+    const newUrlErrors: Record<string, string> = {};
+    for (const [key, val] of urlFields) {
+      if (val.trim() && !isValidUrl(val)) {
+        newUrlErrors[key] = 'Must be a valid https:// URL';
+      }
+    }
+    if (Object.keys(newUrlErrors).length > 0) {
+      setUrlErrors(newUrlErrors);
+      setSubmitError('Please fix the invalid URLs before submitting.');
+      return;
     }
 
     setIsSubmitting(true);
@@ -446,9 +493,13 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 type="text"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
+                onBlur={() => validateUrl('website', website)}
                 placeholder="https://yourbrokerage.com"
-                className={INPUT}
+                className={urlInputClass('website')}
               />
+              {urlErrors['website'] && (
+                <p className="mt-1 text-xs text-red-500">{urlErrors['website']}</p>
+              )}
             </div>
           </div>
         </div>
@@ -495,9 +546,13 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 type="text"
                 value={mlsWebsite}
                 onChange={(e) => setMlsWebsite(e.target.value)}
+                onBlur={() => validateUrl('mlsWebsite', mlsWebsite)}
                 placeholder="https://mlslistings.com"
-                className={INPUT}
+                className={urlInputClass('mlsWebsite')}
               />
+              {urlErrors['mlsWebsite'] && (
+                <p className="mt-1 text-xs text-red-500">{urlErrors['mlsWebsite']}</p>
+              )}
             </div>
             <div>
               <label className={LABEL}>Board of Realtors Website</label>
@@ -505,9 +560,13 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 type="text"
                 value={boardOfRealtorsWebsite}
                 onChange={(e) => setBoardOfRealtorsWebsite(e.target.value)}
+                onBlur={() => validateUrl('boardOfRealtorsWebsite', boardOfRealtorsWebsite)}
                 placeholder="https://arizonarealtors.com"
-                className={INPUT}
+                className={urlInputClass('boardOfRealtorsWebsite')}
               />
+              {urlErrors['boardOfRealtorsWebsite'] && (
+                <p className="mt-1 text-xs text-red-500">{urlErrors['boardOfRealtorsWebsite']}</p>
+              )}
             </div>
             <div>
               <label className={LABEL}>Training Calendar Link</label>
@@ -515,9 +574,13 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 type="text"
                 value={trainingCalendarUrl}
                 onChange={(e) => setTrainingCalendarUrl(e.target.value)}
+                onBlur={() => validateUrl('trainingCalendarUrl', trainingCalendarUrl)}
                 placeholder="https://calendar.google.com/..."
-                className={INPUT}
+                className={urlInputClass('trainingCalendarUrl')}
               />
+              {urlErrors['trainingCalendarUrl'] && (
+                <p className="mt-1 text-xs text-red-500">{urlErrors['trainingCalendarUrl']}</p>
+              )}
             </div>
             <div>
               <label className={LABEL}>Google Drive Link</label>
@@ -525,38 +588,51 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 type="text"
                 value={googleDriveUrl}
                 onChange={(e) => setGoogleDriveUrl(e.target.value)}
+                onBlur={() => validateUrl('googleDriveUrl', googleDriveUrl)}
                 placeholder="https://drive.google.com/..."
-                className={INPUT}
+                className={urlInputClass('googleDriveUrl')}
               />
+              {urlErrors['googleDriveUrl'] && (
+                <p className="mt-1 text-xs text-red-500">{urlErrors['googleDriveUrl']}</p>
+              )}
             </div>
             <div>
               <label className={LABEL}>Additional Links</label>
               <div className="space-y-2">
-                {additionalLinks.map((link, i) => (
-                  <div key={link._key} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={link.label}
-                      onChange={(e) => updateLink(i, { label: e.target.value })}
-                      placeholder="Label"
-                      className={`${INPUT} flex-1`}
-                    />
-                    <input
-                      type="text"
-                      value={link.url}
-                      onChange={(e) => updateLink(i, { url: e.target.value })}
-                      placeholder="https://"
-                      className={`${INPUT} flex-1`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeLink(i)}
-                      className="text-gray-400 hover:text-gray-600 shrink-0"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                ))}
+                {additionalLinks.map((link, i) => {
+                  const urlKey = `additionalLink-${link._key}`;
+                  return (
+                    <div key={link._key}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={link.label}
+                          onChange={(e) => updateLink(i, { label: e.target.value })}
+                          placeholder="Label"
+                          className={`${INPUT} flex-1`}
+                        />
+                        <input
+                          type="text"
+                          value={link.url}
+                          onChange={(e) => updateLink(i, { url: e.target.value })}
+                          onBlur={() => validateUrl(urlKey, link.url)}
+                          placeholder="https://"
+                          className={`${urlInputClass(urlKey)} flex-1`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeLink(i)}
+                          className="text-gray-400 hover:text-gray-600 shrink-0"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                      {urlErrors[urlKey] && (
+                        <p className="mt-1 text-xs text-red-500 pl-[calc(50%+4px)]">{urlErrors[urlKey]}</p>
+                      )}
+                    </div>
+                  );
+                })}
                 <button
                   type="button"
                   onClick={addLink}
