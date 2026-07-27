@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, CheckCircle } from 'lucide-react';
+import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, CheckCircle, Copy, FileText } from 'lucide-react';
 import WorkspaceSubmissionModal from './WorkspaceSubmissionModal';
 
 interface PendingWorkspace {
@@ -238,19 +238,21 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                     <td className={TD}>{formatDate(w.formSentAt)}</td>
                     <td className={TD}>
                       {w.status === 'setup_submitted' ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <button
                             type="button"
-                            className="text-xs text-gray-500 hover:text-gray-700"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors cursor-pointer"
                             onClick={() => setSubmissionTarget(w)}
                           >
+                            <FileText size={12} />
                             View Submission
                           </button>
                           <button
                             type="button"
-                            className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-medium hover:bg-teal-700 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 transition-colors cursor-pointer"
                             onClick={() => { setActivateTarget(w); setActivateError(null); }}
                           >
+                            <CheckCircle size={12} />
                             Complete Setup
                           </button>
                         </div>
@@ -258,7 +260,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                         <div className="flex items-center gap-3">
                           <button
                             type="button"
-                            className="text-xs text-red-500 hover:text-red-700"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-red-200 bg-white text-xs font-medium text-red-500 hover:border-red-300 hover:text-red-700 transition-colors cursor-pointer"
                             onClick={() => setDeleteTarget({
                               id: w.id,
                               name: w.name,
@@ -266,14 +268,16 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                               primaryContactEmail: w.primaryContactEmail,
                             })}
                           >
+                            <X size={12} />
                             Delete
                           </button>
                           {(w.status === 'setup_sent' || w.status === 'setup_viewed') && w.setupToken && (
                             <button
                               type="button"
-                              className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors cursor-pointer"
                               onClick={() => copySetupLink(w.id, w.setupToken!)}
                             >
+                              <Copy size={12} />
                               {copiedId === w.id ? 'Copied!' : 'Copy Link'}
                             </button>
                           )}
@@ -466,7 +470,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                 type="button"
                 onClick={handleActivate}
                 disabled={isActivating}
-                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isActivating ? 'Activating…' : (
                   <>
