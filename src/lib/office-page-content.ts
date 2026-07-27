@@ -246,3 +246,15 @@ export interface OfficePageBuilderResponse {
   lastEditedBy: string | null;
   access: WorkspaceAccess;
 }
+
+/**
+ * API response for the agent/read view (`GET /workspaces/:id/office-page/published`).
+ * `content` is null until the page has been published (never exposes drafts).
+ */
+export interface OfficePagePublishedResponse {
+  workspaceId: string;
+  owningWorkspaceId: string;
+  pageStatus: 'draft' | 'published' | 'archived' | null;
+  content: OfficePageContent | null;
+  access: WorkspaceAccess;
+}

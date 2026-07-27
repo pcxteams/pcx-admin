@@ -34,6 +34,12 @@ export interface BuilderState {
   future: OfficePageContent[];
   savedSnapshot: string;
   dirty: boolean;
+  /**
+   * Identifies the field currently being edited in a continuous burst (e.g. a
+   * text input). Consecutive commits with the same key collapse into one undo
+   * entry so typing doesn't flood — and evict — the structural history.
+   */
+  coalesceKey: string | null;
 }
 
 export type SectionPatch = Partial<
@@ -60,7 +66,7 @@ export type BuilderAction =
   | { type: 'RESET'; content: OfficePageContent }
   | { type: 'UNDO' }
   | { type: 'REDO' }
-  | { type: 'MARK_SAVED' };
+  | { type: 'MARK_SAVED'; snapshot?: string };
 
 const HISTORY_LIMIT = 50;
 /** A row wider than this gets cramped, so drops that would exceed it are ignored. */
@@ -153,11 +159,43 @@ export function initBuilderState(content: OfficePageContent): BuilderState {
     future: [],
     savedSnapshot: serialize(normalized),
     dirty: false,
+    coalesceKey: null,
   };
 }
 
 function findSection(content: OfficePageContent, key: string): OfficePageSection | undefined {
   return content.sections.find((s) => s.key === key);
+}
+
+/**
+ * After a history jump (undo/redo) the previously-selected node may no longer
+ * exist in the restored content — drop the selection so the inspector doesn't
+ * silently render blank.
+ */
+function reconcileSelection(
+  content: OfficePageContent,
+  selection: BuilderSelection,
+): BuilderSelection {
+  switch (selection.kind) {
+    case 'section':
+      return content.sections.some((s) => s.key === selection.sectionKey)
+        ? selection
+        : { kind: 'none' };
+    case 'item': {
+      const section = findSection(content, selection.sectionKey);
+      return section?.items.some((it) => it.id === selection.itemId)
+        ? selection
+        : { kind: 'none' };
+    }
+    case 'row':
+      return groupSectionsIntoRows(content.sections).some(
+        (g) => g.rowId === selection.rowId && g.sections.length > 1,
+      )
+        ? selection
+        : { kind: 'none' };
+    default:
+      return selection;
+  }
 }
 
 function uniqueSectionKey(base: string, sections: OfficePageSection[]): string {
@@ -168,31 +206,42 @@ function uniqueSectionKey(base: string, sections: OfficePageSection[]): string {
   return `${base}-${n}`;
 }
 
-/** Normalize, then push history + recompute dirty (no-op guarded). */
+/**
+ * Normalize, then push history + recompute dirty (no-op guarded). When `coalesce`
+ * is set and matches the previous commit's key, the change folds into the current
+ * history entry instead of pushing a new one — so a burst of keystrokes on one
+ * field is a single undo step. Any commit without a matching key starts a fresh
+ * entry and resets the coalescing key.
+ */
 function commit(
   state: BuilderState,
   content: OfficePageContent,
-  selection?: BuilderSelection,
+  opts: { selection?: BuilderSelection; coalesce?: string } = {},
 ): BuilderState {
+  const { selection, coalesce } = opts;
   const normalized = normalize(content);
   const serialized = serialize(normalized);
   if (serialized === serialize(state.content)) {
     return selection ? { ...state, selection } : state;
   }
+  const coalesced = coalesce != null && state.coalesceKey === coalesce;
   return {
     ...state,
     content: normalized,
     selection: selection ?? state.selection,
-    past: [...state.past.slice(-(HISTORY_LIMIT - 1)), state.content],
+    past: coalesced
+      ? state.past
+      : [...state.past.slice(-(HISTORY_LIMIT - 1)), state.content],
     future: [],
     dirty: serialized !== state.savedSnapshot,
+    coalesceKey: coalesce ?? null,
   };
 }
 
 export function builderReducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
     case 'SELECT':
-      return { ...state, selection: action.selection };
+      return { ...state, selection: action.selection, coalesceKey: null };
 
     case 'ADD_SECTION': {
       const content = deepClone(state.content);
@@ -206,7 +255,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         lockState: 'editable',
         items: [],
       });
-      return commit(state, content, { kind: 'section', sectionKey: key });
+      return commit(state, content, { selection: { kind: 'section', sectionKey: key } });
     }
 
     case 'REMOVE_SECTION': {
@@ -217,7 +266,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         state.selection.sectionKey === action.sectionKey
           ? { kind: 'none' }
           : state.selection;
-      return commit(state, content, sel);
+      return commit(state, content, { selection: sel });
     }
 
     case 'UPDATE_SECTION': {
@@ -225,7 +274,9 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       const section = findSection(content, action.sectionKey);
       if (!section) return state;
       Object.assign(section, action.patch);
-      return commit(state, content);
+      return commit(state, content, {
+        coalesce: `section:${action.sectionKey}:${Object.keys(action.patch).join(',')}`,
+      });
     }
 
     case 'TOGGLE_SECTION_VISIBLE': {
@@ -266,7 +317,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       content.sections = groups
         .filter((group) => group.sections.length > 0)
         .flatMap((group) => group.sections);
-      return commit(state, content, { kind: 'section', sectionKey: moved.key });
+      return commit(state, content, { selection: { kind: 'section', sectionKey: moved.key } });
     }
 
     case 'MOVE_SECTION_TO_NEW_ROW': {
@@ -286,7 +337,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       content.sections = groups
         .filter((group) => group.sections.length > 0)
         .flatMap((group) => group.sections);
-      return commit(state, content, { kind: 'section', sectionKey: moved.key });
+      return commit(state, content, { selection: { kind: 'section', sectionKey: moved.key } });
     }
 
     case 'SPLIT_SECTION': {
@@ -307,7 +358,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       content.sections = groups
         .filter((group) => group.sections.length > 0)
         .flatMap((group) => group.sections);
-      return commit(state, content, { kind: 'section', sectionKey: moved.key });
+      return commit(state, content, { selection: { kind: 'section', sectionKey: moved.key } });
     }
 
     case 'SET_ROW_SPANS': {
@@ -338,7 +389,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       if (Object.keys(merged).length === 0) delete layouts[action.rowId];
       else layouts[action.rowId] = merged;
       content.rowLayouts = Object.keys(layouts).length > 0 ? layouts : undefined;
-      return commit(state, content, { kind: 'row', rowId: action.rowId });
+      return commit(state, content, { selection: { kind: 'row', rowId: action.rowId } });
     }
 
     case 'ADD_ITEM': {
@@ -347,7 +398,9 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       if (!section) return state;
       const item = sectionMeta(section.type).createItem(section.items.length);
       section.items.push(item);
-      return commit(state, content, { kind: 'item', sectionKey: action.sectionKey, itemId: item.id });
+      return commit(state, content, {
+        selection: { kind: 'item', sectionKey: action.sectionKey, itemId: item.id },
+      });
     }
 
     case 'UPDATE_ITEM': {
@@ -356,7 +409,9 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       const item = section?.items.find((it) => it.id === action.itemId);
       if (!item) return state;
       Object.assign(item, action.patch);
-      return commit(state, content);
+      return commit(state, content, {
+        coalesce: `item:${action.sectionKey}:${action.itemId}:${Object.keys(action.patch).join(',')}`,
+      });
     }
 
     case 'TOGGLE_ITEM_ACTIVE': {
@@ -385,7 +440,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       const section = findSection(content, action.sectionKey);
       if (!section) return state;
       section.items = section.items.filter((it) => it.id !== action.itemId);
-      return commit(state, content, { kind: 'section', sectionKey: action.sectionKey });
+      return commit(state, content, { selection: { kind: 'section', sectionKey: action.sectionKey } });
     }
 
     case 'RESET':
@@ -397,9 +452,11 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       return {
         ...state,
         content: previous,
+        selection: reconcileSelection(previous, state.selection),
         past: state.past.slice(0, -1),
         future: [state.content, ...state.future].slice(0, HISTORY_LIMIT),
         dirty: serialize(previous) !== state.savedSnapshot,
+        coalesceKey: null,
       };
     }
 
@@ -409,14 +466,25 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       return {
         ...state,
         content: nextContent,
+        selection: reconcileSelection(nextContent, state.selection),
         past: [...state.past, state.content].slice(-HISTORY_LIMIT),
         future: state.future.slice(1),
         dirty: serialize(nextContent) !== state.savedSnapshot,
+        coalesceKey: null,
       };
     }
 
-    case 'MARK_SAVED':
-      return { ...state, savedSnapshot: serialize(state.content), dirty: false };
+    case 'MARK_SAVED': {
+      // Snapshot the content that was actually persisted (passed by the caller),
+      // not the reducer's current content — edits made while the save was in
+      // flight must stay dirty rather than be silently marked saved.
+      const snapshot = action.snapshot ?? serialize(state.content);
+      return {
+        ...state,
+        savedSnapshot: snapshot,
+        dirty: serialize(state.content) !== snapshot,
+      };
+    }
 
     default:
       return state;

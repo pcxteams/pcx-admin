@@ -3,22 +3,23 @@ import Link from 'next/link';
 import { ArrowLeft, Lock, PencilLine } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
-import type { OfficePageBuilderResponse } from '@/lib/office-page-content';
+import type { OfficePagePublishedResponse } from '@/lib/office-page-content';
 import OfficePageView from './OfficePageView';
 
-function StatusBadge({ status }: { status: OfficePageBuilderResponse['pageStatus'] }) {
+function StatusBadge({ status }: { status: OfficePagePublishedResponse['pageStatus'] }) {
   const map: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-500',
     published: 'bg-green-50 text-green-600',
     archived: 'bg-red-50 text-red-500',
   };
+  const label = status ?? 'draft';
   return (
     <span
       className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
-        map[status] ?? map.draft
+        map[label] ?? map.draft
       }`}
     >
-      {status}
+      {label}
     </span>
   );
 }
@@ -32,8 +33,11 @@ export default async function OfficePagePage({
   if (!session) redirect('/login');
 
   const { workspaceId } = await params;
-  const data = await apiGet<OfficePageBuilderResponse>(
-    `/workspaces/${workspaceId}/office-page`,
+  // The read/"Agent Office" surface must only ever show published content — the
+  // published endpoint returns null content until the page is published, never
+  // the in-progress draft (that lives behind the builder, gated on canEdit).
+  const data = await apiGet<OfficePagePublishedResponse>(
+    `/workspaces/${workspaceId}/office-page/published`,
   );
 
   return (
@@ -79,7 +83,18 @@ export default async function OfficePagePage({
             )}
           </div>
 
-          <OfficePageView content={data.content} />
+          {data.content ? (
+            <OfficePageView content={data.content} />
+          ) : (
+            <div className="rounded-xl border border-gray-100 bg-white px-6 py-16 text-center">
+              <p className="text-sm text-gray-500">
+                This office page hasn&apos;t been published yet.
+                {data.access.canEdit
+                  ? ' Open the builder to make changes and publish it.'
+                  : ' Check back once a manager publishes it.'}
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>
