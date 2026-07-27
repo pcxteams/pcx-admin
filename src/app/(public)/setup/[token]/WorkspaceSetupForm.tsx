@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useId } from 'react';
-import { Building2, Users, Plus, X, CheckCircle, ImageIcon } from 'lucide-react';
+import { useState, useId, useRef, useCallback } from 'react';
+import { Building2, Users, Plus, X, CheckCircle, ImageIcon, Upload, Loader2 } from 'lucide-react';
 
 interface Prefill {
   workspaceId: string;
@@ -70,19 +70,34 @@ function SectionHeader({ n, title, subtitle }: { n: number; title: string; subti
 }
 
 function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const pickerRef = useRef<HTMLInputElement>(null);
+  const isValidHex = /^#[0-9a-fA-F]{6}$/.test(value);
+
   return (
     <div>
       <label className={LABEL}>{label}</label>
-      <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
-        <div
-          className="w-5 h-5 rounded-sm border border-gray-200 shrink-0"
-          style={{ background: /^#[0-9a-fA-F]{3,6}$/.test(value) ? value : '#ffffff' }}
-        />
+      <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-transparent">
+        <div className="relative shrink-0">
+          <div
+            className="w-6 h-6 rounded border border-gray-200 cursor-pointer"
+            style={{ background: isValidHex ? value : '#ffffff' }}
+            onClick={() => pickerRef.current?.click()}
+          />
+          <input
+            ref={pickerRef}
+            type="color"
+            value={isValidHex ? value : '#000000'}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+            tabIndex={-1}
+          />
+        </div>
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="#000000"
+          maxLength={7}
           className="flex-1 text-sm text-gray-900 placeholder-gray-400 outline-none bg-transparent"
         />
       </div>
@@ -243,6 +258,13 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
 
   const [urlErrors, setUrlErrors] = useState<Record<string, string>>({});
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -260,6 +282,45 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
   function urlInputClass(key: string) {
     return urlErrors[key] ? INPUT_ERROR : INPUT;
   }
+
+  const handleLogoSelect = useCallback(async (file: File) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setLogoError('Only PNG, JPG, SVG, or WebP files are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError('File must be under 5 MB.');
+      return;
+    }
+    setLogoFile(file);
+    setLogoError(null);
+    setLogoUrl(null);
+    setLogoPreview(URL.createObjectURL(file));
+    setLogoUploading(true);
+    try {
+      const res = await fetch(`/api/workspace-setup/${token}/logo-upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentType: file.type }),
+      });
+      if (!res.ok) throw new Error('Could not get upload URL.');
+      const { uploadUrl, publicUrl } = await res.json() as { uploadUrl: string; publicUrl: string };
+      const s3Res = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!s3Res.ok) throw new Error('Upload to S3 failed.');
+      setLogoUrl(publicUrl);
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
+      setLogoPreview(null);
+      setLogoFile(null);
+    } finally {
+      setLogoUploading(false);
+    }
+  }, [token]);
 
   function addLeader() {
     setLeaders((prev) => [
@@ -344,6 +405,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         body: JSON.stringify({
           clientFacingName: clientFacingName.trim(),
           timeZone,
+          logoUrl: logoUrl || undefined,
           primaryColor: primaryColor || undefined,
           secondaryColor: secondaryColor || undefined,
           address: address.trim() || undefined,
@@ -464,14 +526,52 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <SectionHeader n={2} title="Branding" />
           <div className="space-y-4">
-            {/* Logo upload (UI only — S3 integration pending) */}
+            {/* Logo upload */}
             <div>
               <label className={LABEL}>Company Logo</label>
-              <div className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 px-6 py-8 text-center cursor-pointer hover:border-gray-300 transition-colors">
-                <ImageIcon size={24} className="text-gray-300" />
-                <p className="text-sm text-gray-400">Click to upload logo</p>
-                <p className="text-xs text-gray-300">PNG, SVG, JPG · Max 2MB</p>
-              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoSelect(f); }}
+              />
+              {logoPreview ? (
+                <div className="relative flex items-center gap-4 rounded-lg border border-gray-200 px-4 py-3">
+                  <img src={logoPreview} alt="Logo preview" className="h-12 max-w-[120px] object-contain" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700 truncate">{logoFile?.name}</p>
+                    {logoUploading ? (
+                      <p className="flex items-center gap-1.5 text-xs text-teal-600 mt-0.5">
+                        <Loader2 size={11} className="animate-spin" /> Uploading…
+                      </p>
+                    ) : logoUrl ? (
+                      <p className="flex items-center gap-1 text-xs text-green-600 mt-0.5">
+                        <CheckCircle size={11} /> Uploaded
+                      </p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setLogoFile(null); setLogoPreview(null); setLogoUrl(null); setLogoError(null); if (logoInputRef.current) logoInputRef.current.value = ''; }}
+                    className="text-gray-400 hover:text-gray-600 shrink-0"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 px-6 py-8 text-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/40 transition-colors"
+                  onClick={() => logoInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleLogoSelect(f); }}
+                >
+                  <Upload size={22} className="text-gray-300" />
+                  <p className="text-sm text-gray-500">Click or drag to upload logo</p>
+                  <p className="text-xs text-gray-400">PNG, JPG, SVG, WebP · Max 5 MB</p>
+                </div>
+              )}
+              {logoError && <p className="mt-1 text-xs text-red-500">{logoError}</p>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <ColorInput label="Primary Brand Color" value={primaryColor} onChange={setPrimaryColor} />
