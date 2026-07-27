@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 
 interface Option {
   id: string;
@@ -14,6 +14,8 @@ interface SearchableSelectProps {
   onChange: (id: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  maxInitial?: number;
+  clearable?: boolean;
 }
 
 export default function SearchableSelect({
@@ -22,6 +24,8 @@ export default function SearchableSelect({
   onChange,
   placeholder = 'Select…',
   disabled = false,
+  maxInitial = 8,
+  clearable = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -31,7 +35,7 @@ export default function SearchableSelect({
 
   const filtered = query
     ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
-    : options;
+    : options.slice(0, maxInitial);
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -67,7 +71,22 @@ export default function SearchableSelect({
         <span className={selected ? 'text-gray-900' : 'text-gray-400'}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown size={15} className="text-gray-400 shrink-0 ml-2" />
+        <span className="flex items-center gap-1 shrink-0 ml-2">
+          {clearable && selected && (
+            <span
+              role="button"
+              aria-label="Clear selection"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X size={13} />
+            </span>
+          )}
+          <ChevronDown size={15} className="text-gray-400" />
+        </span>
       </button>
 
       {open && (
@@ -99,6 +118,11 @@ export default function SearchableSelect({
               ))
             )}
           </ul>
+          {!query && options.length > maxInitial && (
+            <p className="px-3 py-2 text-xs text-gray-400 border-t border-gray-100">
+              Showing {maxInitial} of {options.length} — type to search
+            </p>
+          )}
         </div>
       )}
     </div>

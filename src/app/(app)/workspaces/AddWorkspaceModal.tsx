@@ -5,13 +5,6 @@ import { useRouter } from 'next/navigation';
 import { X, LayoutGrid, Users, Info } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
-const OFFICE_WORKSPACES = [
-  { id: '1', label: 'Keller Williams Realty' },
-  { id: '2', label: 'RE/MAX Premier' },
-  { id: '3', label: 'Sunbelt Realty Group' },
-  { id: '4', label: 'Mesa Valley Realty' },
-];
-
 const ALL_WORKSPACES = [
   { id: '1', label: 'Keller Williams Realty' },
   { id: '2', label: 'RE/MAX Premier' },
@@ -67,11 +60,31 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [emailBody, setEmailBody] = useState(DEFAULT_EMAIL_BODY);
   const [emailInput, setEmailInput] = useState('');
 
+  const [officeWorkspaces, setOfficeWorkspaces] = useState<{ id: string; label: string }[]>([]);
+
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const emailInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function fetchOfficeWorkspaces() {
+      try {
+        const res = await fetch('/api/workspaces', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        setOfficeWorkspaces(
+          (data.active as { id: string; name: string; type: string }[])
+            .filter((w) => w.type === 'office')
+            .map((w) => ({ id: w.id, label: w.name })),
+        );
+      } catch {
+        // silently fail — dropdown stays empty
+      }
+    }
+    fetchOfficeWorkspaces();
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -254,10 +267,11 @@ export default function AddWorkspaceModal({ onClose }: Props) {
             <div>
               <label className={LABEL_CLASS}>Reports To (optional)</label>
               <SearchableSelect
-                options={OFFICE_WORKSPACES}
+                options={officeWorkspaces}
                 value={reportsTo}
                 onChange={setReportsTo}
-                placeholder="Select an office workspace…"
+                placeholder={officeWorkspaces.length === 0 ? 'No active office workspaces' : 'Select an office workspace…'}
+                clearable
               />
             </div>
           )}
