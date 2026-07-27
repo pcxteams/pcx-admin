@@ -1,6 +1,6 @@
 'use client';
 
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Dispatch } from 'react';
 import type {
   OfficePageAction,
@@ -8,10 +8,10 @@ import type {
   OfficePageItem,
   OfficePageContent,
 } from '@/lib/office-page-content';
-import type { RowLayout } from '@/lib/office-page-content';
+import type { RowLayout, RowTemplate } from '@/lib/office-page-content';
 import type { BuilderAction, BuilderSelection } from './builder-reducer';
 import { sectionMeta, type InspectorField } from './section-registry';
-import { groupSectionsIntoRows, sectionSpan } from './section-rows';
+import { groupSectionsIntoRows, sectionSpan, rowTemplate, templatePlacement } from './section-rows';
 
 const LABEL = 'block text-[11px] font-semibold tracking-wide text-gray-500 uppercase mb-1';
 const INPUT =
@@ -317,6 +317,36 @@ function Seg<T extends string>({
   );
 }
 
+/** Available row arrangements for a given section count (span layouts need ≥ 3). */
+const LAYOUT_OPTIONS: { t: RowTemplate; label: string }[] = [
+  { t: 'columns', label: 'Columns' },
+  { t: 'right-span', label: 'Right spans' },
+  { t: 'left-span', label: 'Left spans' },
+  { t: 'top-span', label: 'Top spans' },
+  { t: 'bottom-span', label: 'Bottom spans' },
+];
+
+/** Miniature diagram of a row arrangement (reuses the real placement maths). */
+function LayoutThumb({ template, n }: { template: RowTemplate; n: number }) {
+  if (template === 'columns') {
+    return (
+      <div className="flex h-9 gap-0.5">
+        {Array.from({ length: n }).map((_, i) => (
+          <div key={i} className="flex-1 rounded-sm bg-teal-500/70" />
+        ))}
+      </div>
+    );
+  }
+  const { cols, cells } = templatePlacement(template, n);
+  return (
+    <div className="grid h-9 gap-0.5" style={{ gridTemplateColumns: cols, gridAutoRows: '1fr' }}>
+      {cells.map((c, i) => (
+        <div key={i} className="rounded-sm bg-teal-500/70" style={{ gridColumn: c.gc, gridRow: c.gr }} />
+      ))}
+    </div>
+  );
+}
+
 function RowInspector({
   rowId,
   content,
@@ -335,20 +365,56 @@ function RowInspector({
     );
   }
 
+  const n = group.sections.length;
   const spans = group.sections.map(sectionSpan);
-  const presets = SPAN_PRESETS[group.sections.length] ?? [];
+  const presets = SPAN_PRESETS[n] ?? [];
   const rowLayout: RowLayout = content.rowLayouts?.[rowId] ?? {};
+  const template = rowTemplate(rowLayout, n);
+  const layoutOptions = LAYOUT_OPTIONS.filter((o) => o.t === 'columns' || n >= 3);
   const spansEqual = (a: number[]) => a.length === spans.length && a.every((v, i) => v === spans[i]);
 
   const setLayout = (patch: Partial<RowLayout>) => dispatch({ type: 'SET_ROW_LAYOUT', rowId, patch });
+  const moveWithin = (fromIndex: number, toIndex: number) =>
+    dispatch({ type: 'MOVE_SECTION_ACROSS', fromRowId: rowId, fromIndex, toRowId: rowId, toIndex });
 
   return (
     <div className="space-y-5">
       <div>
-        <span className="text-xs font-medium text-gray-400">Row · {group.sections.length} columns</span>
+        <span className="text-xs font-medium text-gray-400">Row · {n} sections</span>
       </div>
 
-      {presets.length > 0 && (
+      {layoutOptions.length > 1 && (
+        <div>
+          <span className={LABEL}>Layout</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {layoutOptions.map((o) => {
+              const active = template === o.t;
+              return (
+                <button
+                  key={o.t}
+                  type="button"
+                  onClick={() => setLayout({ template: o.t === 'columns' ? undefined : o.t })}
+                  className={`rounded-lg border p-2 transition ${
+                    active ? 'border-teal-400 ring-1 ring-teal-200' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="mb-1">
+                    <LayoutThumb template={o.t} n={n} />
+                  </div>
+                  <span className="text-[11px] text-gray-500">{o.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {template !== 'columns' && (
+            <p className="mt-1.5 text-[11px] text-gray-400">
+              Reorder the sections below to change which one spans.
+            </p>
+          )}
+        </div>
+      )}
+
+      {template === 'columns' && presets.length > 0 && (
         <div>
           <span className={LABEL}>Column ratio</span>
           <div className="grid grid-cols-2 gap-1.5">
@@ -411,11 +477,31 @@ function RowInspector({
       />
 
       <div>
-        <span className={LABEL}>Columns</span>
+        <span className={LABEL}>Sections</span>
         <div className="space-y-1">
-          {group.sections.map((s) => (
-            <div key={s.key} className="flex items-center justify-between rounded-lg border border-gray-100 px-2.5 py-1.5">
-              <span className="truncate text-sm text-gray-700">{s.title}</span>
+          {group.sections.map((s, i) => (
+            <div key={s.key} className="flex items-center gap-1.5 rounded-lg border border-gray-100 px-2.5 py-1.5">
+              <span className="flex shrink-0 items-center">
+                <button
+                  type="button"
+                  disabled={i === 0}
+                  onClick={() => moveWithin(i, i - 1)}
+                  title="Move up"
+                  className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  disabled={i === n - 1}
+                  onClick={() => moveWithin(i, i + 1)}
+                  title="Move down"
+                  className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <ChevronDown size={13} />
+                </button>
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{s.title}</span>
               <button
                 type="button"
                 onClick={() => dispatch({ type: 'SPLIT_SECTION', sectionKey: s.key })}

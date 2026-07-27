@@ -213,16 +213,51 @@ export interface OfficePageSection {
   items: OfficePageItem[];
 }
 
+/**
+ * Arrangement of a multi-section row.
+ *  - `columns`     — sections side by side, widths from each section's `span` (default)
+ *  - `right-span`  — all but the last section stack in the left column; the last
+ *                    section is one column spanning their full height (a right rail)
+ *  - `left-span`   — mirror of right-span (first section spans the left column)
+ *  - `top-span`    — first section spans full width on top; the rest share a row below
+ *  - `bottom-span` — the rest share a row on top; the last spans full width below
+ * Span templates need ≥ 3 sections; with 2 they behave like `columns`.
+ */
+export type RowTemplate = 'columns' | 'left-span' | 'right-span' | 'top-span' | 'bottom-span';
+
 export interface RowLayout {
   align?: 'start' | 'center' | 'stretch' | 'end';
   gap?: 'sm' | 'md' | 'lg';
   stackBelow?: 'sm' | 'md' | 'lg';
+  /** Row arrangement; absent/`columns` = the classic side-by-side split. */
+  template?: RowTemplate;
+}
+
+/** Page-level footer bar shown at the bottom of the rendered office page. */
+export interface OfficePageFooter {
+  officeHours?: string;
+  /** Display text for the company website (e.g. `www.example.com`). */
+  website?: string;
+  /** Absolute href the website label links to. */
+  websiteUrl?: string;
+  helpLabel?: string;
+  helpHref?: string;
+  phone?: string;
+}
+
+/** Hero/brand labelling for the top of the rendered office page. */
+export interface OfficePageBranding {
+  name?: string;
+  tagline?: string;
 }
 
 export interface OfficePageContent {
   sections: OfficePageSection[];
   popupCards?: PopupCardItem[];
   rowLayouts?: Record<string, RowLayout>;
+  /** Optional page-level chrome consumed by the render view (not the builder). */
+  footer?: OfficePageFooter;
+  branding?: OfficePageBranding;
 }
 
 /** API response for the builder view (`GET /workspaces/:id/office-page`). */

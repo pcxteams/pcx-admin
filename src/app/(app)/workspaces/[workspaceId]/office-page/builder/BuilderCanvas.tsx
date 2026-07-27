@@ -1,12 +1,12 @@
 'use client';
 
-import { Fragment, useRef, useState, type Dispatch, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { Fragment, useRef, useState, type CSSProperties, type Dispatch, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical, Eye, EyeOff, Plus, Rows2, Trash2 } from 'lucide-react';
-import type { OfficePageContent, OfficePageItem, OfficePageSection } from '@/lib/office-page-content';
+import type { OfficePageContent, OfficePageItem, OfficePageSection, RowLayout } from '@/lib/office-page-content';
 import type { BuilderAction, BuilderSelection } from './builder-reducer';
 import { sectionMeta } from './section-registry';
-import { groupSectionsIntoRows, sectionSpan } from './section-rows';
+import { groupSectionsIntoRows, sectionSpan, rowTemplate, templatePlacement, TemplateStyles, type TemplateCell } from './section-rows';
 
 /**
  * WYSIWYG builder canvas with responsive rows (v2 Phase 6 port). Sections lay out
@@ -34,12 +34,14 @@ export default function BuilderCanvas({
     <Droppable droppableId="rows" type="ROW">
       {(provided) => (
         <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-col">
+          <TemplateStyles />
           <NewRowLane index={0} active={lanesActive} />
           {rows.map((row, index) => (
             <Fragment key={row.rowId}>
               <RowBlock
                 rowId={row.rowId}
                 sections={row.sections}
+                rowLayout={content.rowLayouts?.[row.rowId]}
                 index={index}
                 selection={selection}
                 dispatch={dispatch}
@@ -85,12 +87,14 @@ function NewRowLane({ index, active }: { index: number; active: boolean }) {
 function RowBlock({
   rowId,
   sections,
+  rowLayout,
   index,
   selection,
   dispatch,
 }: {
   rowId: string;
   sections: OfficePageSection[];
+  rowLayout: RowLayout | undefined;
   index: number;
   selection: BuilderSelection;
   dispatch: Dispatch<BuilderAction>;
@@ -98,6 +102,12 @@ function RowBlock({
   const multi = sections.length > 1;
   const rowSelected = selection.kind === 'row' && selection.rowId === rowId;
   const spans = sections.map(sectionSpan);
+  const template = rowTemplate(rowLayout, sections.length);
+  const isTemplate = template !== 'columns';
+  // Template rows lay out as a CSS grid (a column can span several stacked
+  // sections); their sections are reordered from the Row inspector rather than
+  // dragged, so intra-row drag is disabled to keep the grid stable.
+  const placement = isTemplate ? templatePlacement(template, sections.length) : null;
   const commitPair = (i: number, a: number, b: number) => {
     const next = [...spans];
     next[i] = a;
@@ -122,7 +132,7 @@ function RowBlock({
                 e.stopPropagation();
                 dispatch({ type: 'SELECT', selection: { kind: 'row', rowId } });
               }}
-              title={multi ? 'Drag to reorder · click to set the column layout' : 'Drag to reorder'}
+              title={multi ? 'Drag to reorder · click to set the row layout' : 'Drag to reorder'}
               className={`mt-3 flex w-5 shrink-0 cursor-grab items-start justify-center rounded-md py-1 text-gray-300 transition-opacity hover:text-gray-500 active:cursor-grabbing ${
                 rowSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
               }`}
@@ -135,7 +145,12 @@ function RowBlock({
                 <div
                   ref={dropProvided.innerRef}
                   {...dropProvided.droppableProps}
-                  className="flex min-w-0 flex-1 items-stretch gap-3"
+                  className={isTemplate ? 'opl-tmpl-inner min-w-0 flex-1' : 'flex min-w-0 flex-1 items-stretch gap-3'}
+                  style={
+                    isTemplate && placement
+                      ? ({ display: 'grid', gridTemplateColumns: placement.cols, gap: '0.75rem', alignItems: 'start' } as CSSProperties)
+                      : undefined
+                  }
                 >
                   {sections.map((section, colIndex) => (
                     <SectionColumn
@@ -143,9 +158,11 @@ function RowBlock({
                       section={section}
                       index={colIndex}
                       inRow={multi}
-                      grow={multi ? spans[colIndex] : 1}
+                      grow={isTemplate ? 1 : multi ? spans[colIndex] : 1}
+                      templateCell={placement ? placement.cells[colIndex] : null}
+                      dragDisabled={isTemplate}
                       resize={
-                        multi && colIndex < sections.length - 1
+                        !isTemplate && multi && colIndex < sections.length - 1
                           ? {
                               spanA: spans[colIndex],
                               spanB: spans[colIndex + 1],
@@ -173,6 +190,8 @@ function SectionColumn({
   index,
   inRow,
   grow,
+  templateCell,
+  dragDisabled,
   resize,
   selection,
   dispatch,
@@ -181,34 +200,41 @@ function SectionColumn({
   index: number;
   inRow: boolean;
   grow: number;
+  templateCell: TemplateCell | null;
+  dragDisabled: boolean;
   resize: { spanA: number; spanB: number; onCommit: (a: number, b: number) => void } | null;
   selection: BuilderSelection;
   dispatch: Dispatch<BuilderAction>;
 }) {
   const meta = sectionMeta(section.type);
   const selected = selection.kind === 'section' && selection.sectionKey === section.key;
+  const placementStyle: CSSProperties = templateCell
+    ? { gridColumn: templateCell.gc, gridRow: templateCell.gr, minWidth: 0 }
+    : { flexGrow: grow, flexBasis: 0, minWidth: 0 };
 
   return (
-    <Draggable draggableId={`section:${section.key}`} index={index}>
+    <Draggable draggableId={`section:${section.key}`} index={index} isDragDisabled={dragDisabled}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          style={{ ...provided.draggableProps.style, flexGrow: grow, flexBasis: 0, minWidth: 0 }}
-          className={`group/section relative rounded-2xl border bg-white p-3 transition-colors ${
+          style={{ ...provided.draggableProps.style, ...placementStyle }}
+          className={`group/section relative ${templateCell ? 'opl-cell' : ''} rounded-2xl border bg-white p-3 transition-colors ${
             selected ? 'border-teal-400 ring-1 ring-teal-200' : 'border-gray-200 hover:border-gray-300'
           } ${snapshot.isDragging ? 'shadow-xl' : ''} ${section.visible ? '' : 'opacity-70'}`}
         >
           {resize && <ColumnGutter spanA={resize.spanA} spanB={resize.spanB} onCommit={resize.onCommit} />}
 
           <div className="mb-2 flex items-center gap-2">
-            <span
-              {...provided.dragHandleProps}
-              title="Drag to move, reorder, or combine into a row"
-              className="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
-            >
-              <GripVertical size={16} />
-            </span>
+            {!dragDisabled && (
+              <span
+                {...provided.dragHandleProps}
+                title="Drag to move, reorder, or combine into a row"
+                className="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+              >
+                <GripVertical size={16} />
+              </span>
+            )}
             <button
               type="button"
               onClick={(e) => {
