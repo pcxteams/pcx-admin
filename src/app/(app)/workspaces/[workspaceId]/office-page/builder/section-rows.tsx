@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { OfficePageSection, RowLayout } from '@/lib/office-page-content';
+import type { OfficePageSection, RowLayout, RowTemplate } from '@/lib/office-page-content';
 
 /**
  * Responsive row/column layout for office-page sections (ported from v2 Phase 6).
@@ -57,6 +57,58 @@ export function sectionSpan(section: OfficePageSection): number {
   return Math.min(ROW_SPAN_UNITS, Math.max(1, Math.round(span)));
 }
 
+/** The `template` for a row, treating anything below 3 sections as plain columns. */
+export function rowTemplate(rowLayout: RowLayout | undefined, sectionCount: number): RowTemplate {
+  const t = rowLayout?.template;
+  if (!t || t === 'columns' || sectionCount < 3) return 'columns';
+  return t;
+}
+
+/** One cell's placement in a template grid, as CSS `grid-column` / `grid-row`. */
+export interface TemplateCell {
+  gc: string;
+  gr: string;
+}
+
+/**
+ * CSS-grid column track list + per-section placement for a template row. Sections
+ * are placed in array order; span templates dedicate the spanning column to the
+ * first (`left-span`) or last (`right-span`) section and stack the rest, while
+ * top/bottom-span put one full-width section above/below a row of the others.
+ */
+export function templatePlacement(
+  template: RowTemplate,
+  n: number,
+): { cols: string; cells: TemplateCell[] } {
+  const cells: TemplateCell[] = [];
+  const wide = 'minmax(0, 2.4fr)';
+  const narrow = 'minmax(0, 1fr)';
+  switch (template) {
+    case 'right-span': {
+      for (let i = 0; i < n - 1; i += 1) cells.push({ gc: '1', gr: String(i + 1) });
+      cells.push({ gc: '2', gr: `1 / span ${n - 1}` });
+      return { cols: `${wide} ${narrow}`, cells };
+    }
+    case 'left-span': {
+      cells.push({ gc: '1', gr: `1 / span ${n - 1}` });
+      for (let i = 1; i < n; i += 1) cells.push({ gc: '2', gr: String(i) });
+      return { cols: `${narrow} ${wide}`, cells };
+    }
+    case 'top-span': {
+      cells.push({ gc: '1 / -1', gr: '1' });
+      for (let i = 1; i < n; i += 1) cells.push({ gc: String(i), gr: '2' });
+      return { cols: `repeat(${n - 1}, minmax(0, 1fr))`, cells };
+    }
+    case 'bottom-span': {
+      for (let i = 0; i < n - 1; i += 1) cells.push({ gc: String(i + 1), gr: '1' });
+      cells.push({ gc: '1 / -1', gr: '2' });
+      return { cols: `repeat(${n - 1}, minmax(0, 1fr))`, cells };
+    }
+    default:
+      return { cols: '', cells: [] };
+  }
+}
+
 interface SectionRowProps {
   sections: OfficePageSection[];
   rowLayout?: RowLayout;
@@ -75,6 +127,34 @@ export function SectionRow({ sections, rowLayout, children }: SectionRowProps) {
   }
 
   const stack = rowLayout?.stackBelow ?? 'md';
+  const template = rowTemplate(rowLayout, sections.length);
+
+  // Template arrangements (spanning columns) use a CSS grid via inline styles;
+  // plain columns keep the flex split below. `TEMPLATE_STACK_CSS` collapses the
+  // grid to one column on narrow viewports.
+  if (template !== 'columns') {
+    const { cols, cells } = templatePlacement(template, sections.length);
+    const innerStyle: CSSProperties = {
+      display: 'grid',
+      gridTemplateColumns: cols,
+      gap: GAP_CSS[rowLayout?.gap ?? 'md'],
+      alignItems: ALIGN_CSS[rowLayout?.align ?? 'start'],
+    };
+    return (
+      <div className="opl-tmpl-inner" style={innerStyle}>
+        {sections.map((section, i) => (
+          <div
+            key={section.key}
+            className="opl-cell"
+            style={{ gridColumn: cells[i]?.gc, gridRow: cells[i]?.gr, minWidth: 0 }}
+          >
+            {children(section)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const innerStyle = {
     '--opb-gap': GAP_CSS[rowLayout?.gap ?? 'md'],
     '--opb-align': ALIGN_CSS[rowLayout?.align ?? 'stretch'],
@@ -95,4 +175,16 @@ export function SectionRow({ sections, rowLayout, children }: SectionRowProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Collapses any row template to a single column on narrow viewports. Rendered
+ * once by each surface (read view + builder canvas) as a colocated <style> so it
+ * ships with the component's hot-reload rather than depending on globals.css.
+ */
+export const TEMPLATE_STACK_CSS =
+  '@media (max-width:640px){.opl-tmpl-inner{grid-template-columns:1fr !important}.opl-tmpl-inner>.opl-cell{grid-column:1/-1 !important;grid-row:auto !important}}';
+
+export function TemplateStyles() {
+  return <style dangerouslySetInnerHTML={{ __html: TEMPLATE_STACK_CSS }} />;
 }
