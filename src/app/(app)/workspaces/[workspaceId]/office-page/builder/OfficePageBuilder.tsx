@@ -95,14 +95,17 @@ export default function OfficePageBuilder({
   async function handleSave() {
     setBusy('save');
     setError(null);
+    // Capture exactly what we send; MARK_SAVED snapshots this, not whatever the
+    // user may have edited while the request was in flight.
+    const sent = state.content;
     try {
-      const res = await mutate(`${base}/draft`, 'PATCH', { content: state.content });
+      const res = await mutate(`${base}/draft`, 'PATCH', { content: sent });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { message?: string };
         setError(data.message ?? 'Failed to save draft.');
         return;
       }
-      dispatch({ type: 'MARK_SAVED' });
+      dispatch({ type: 'MARK_SAVED', snapshot: JSON.stringify(sent) });
     } catch {
       setError('Network error while saving.');
     } finally {
@@ -113,15 +116,16 @@ export default function OfficePageBuilder({
   async function handlePublish() {
     setBusy('publish');
     setError(null);
+    const sent = state.content;
     try {
       // Persist the current draft first so publish reflects on-screen edits.
-      const draftRes = await mutate(`${base}/draft`, 'PATCH', { content: state.content });
+      const draftRes = await mutate(`${base}/draft`, 'PATCH', { content: sent });
       if (!draftRes.ok) {
         const data = (await draftRes.json().catch(() => ({}))) as { message?: string };
         setError(data.message ?? 'Failed to save before publishing.');
         return;
       }
-      dispatch({ type: 'MARK_SAVED' });
+      dispatch({ type: 'MARK_SAVED', snapshot: JSON.stringify(sent) });
       const res = await mutate(`${base}/publish`, 'POST');
       if (!res.ok) {
         setError('Failed to publish.');

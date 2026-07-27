@@ -337,6 +337,17 @@ function ColumnGutter({
     handle.setPointerCapture(e.pointerId);
     setDragging(true);
 
+    const cleanup = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onCancel);
+      try {
+        handle.releasePointerCapture(e.pointerId);
+      } catch {
+        // capture may already be gone (e.g. the element unmounted) — ignore
+      }
+      setDragging(false);
+    };
     const onMove = (ev: PointerEvent) => {
       const widthA = Math.min(pairPx - minPx, Math.max(minPx, startWidthA + (ev.clientX - startX)));
       const a = Math.min(pairSpan - 1, Math.max(1, Math.round((widthA / pairPx) * pairSpan)));
@@ -345,14 +356,20 @@ function ColumnGutter({
       nextEl.style.flexGrow = String(pending[1]);
     };
     const onUp = () => {
-      handle.releasePointerCapture(e.pointerId);
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onUp);
-      setDragging(false);
+      cleanup();
       if (pending[0] !== spanA || pending[1] !== spanB) onCommit(pending[0], pending[1]);
+    };
+    // An interrupted drag (touch cancel, gesture, unmount) never fires pointerup:
+    // restore the pre-drag widths so the imperatively-set flexGrow doesn't linger
+    // out of sync with reducer state, and always tear down capture + listeners.
+    const onCancel = () => {
+      colEl.style.flexGrow = String(spanA);
+      nextEl.style.flexGrow = String(spanB);
+      cleanup();
     };
     handle.addEventListener('pointermove', onMove);
     handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onCancel);
   }
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLButtonElement>) {

@@ -1,4 +1,3 @@
-import { EyeOff } from 'lucide-react';
 import type {
   OfficePageAction,
   OfficePageContent,
@@ -31,16 +30,29 @@ function primaryAction(item: OfficePageItem): OfficePageAction | undefined {
   return undefined;
 }
 
+/** Resolve the actual href for an action, honouring scheme-based types. */
+function actionHref(action: OfficePageAction, dest: string): string {
+  switch (action.type) {
+    case 'email':
+      return dest.startsWith('mailto:') ? dest : `mailto:${dest}`;
+    case 'phone':
+      return dest.startsWith('tel:') ? dest : `tel:${dest.replace(/\s+/g, '')}`;
+    default:
+      return dest;
+  }
+}
+
 function ActionLink({ action }: { action: OfficePageAction }) {
   const dest = action.destination?.trim();
   const label = action.label || 'Open';
   if (!dest) {
     return <span className="text-xs text-gray-300">{label} (no link set)</span>;
   }
+  const href = actionHref(action, dest);
   const external = action.openBehavior !== 'same_tab' && /^https?:\/\//.test(dest);
   return (
     <a
-      href={dest}
+      href={href}
       target={external ? '_blank' : undefined}
       rel={external ? 'noopener noreferrer' : undefined}
       className="text-xs font-medium text-teal-600 hover:text-teal-700"
@@ -58,12 +70,9 @@ function ItemCard({ item }: { item: OfficePageItem }) {
     <div
       className={`rounded-lg border px-4 py-3.5 bg-white ${
         featured ? 'border-amber-200 ring-1 ring-amber-100' : 'border-gray-100'
-      } ${item.active ? '' : 'opacity-50'}`}
+      }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-gray-900 leading-tight">{itemTitle(item)}</p>
-        {!item.active && <EyeOff size={13} className="text-gray-300 shrink-0 mt-0.5" />}
-      </div>
+      <p className="text-sm font-medium text-gray-900 leading-tight">{itemTitle(item)}</p>
       {description && <p className="mt-1 text-xs text-gray-500 line-clamp-2">{description}</p>}
       {action && (
         <div className="mt-2">
@@ -75,7 +84,11 @@ function ItemCard({ item }: { item: OfficePageItem }) {
 }
 
 function SectionBlock({ section }: { section: OfficePageSection }) {
-  const items = [...section.items].sort((a, b) => a.order - b.order);
+  // Inactive items are hidden from the agent/published surface, mirroring how
+  // invisible sections are filtered below.
+  const items = [...section.items]
+    .filter((item) => item.active)
+    .sort((a, b) => a.order - b.order);
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
