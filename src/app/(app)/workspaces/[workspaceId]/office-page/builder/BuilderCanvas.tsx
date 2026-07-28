@@ -50,6 +50,7 @@ export default function BuilderCanvas({
                 rowLayout={content.rowLayouts?.[row.rowId]}
                 branding={content.branding}
                 index={index}
+                columnDragging={lanesActive}
                 selection={selection}
                 dispatch={dispatch}
               />
@@ -71,11 +72,11 @@ function NewRowLane({ index, active }: { index: number; active: boolean }) {
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`shrink-0 overflow-hidden transition-all ${active ? 'my-1 h-9' : 'h-6'}`}
+          className={`shrink-0 overflow-hidden transition-all ${active ? 'my-2 h-14' : 'h-6'}`}
         >
           {active && (
             <div
-              className={`flex h-9 items-center justify-center rounded-xl border border-dashed text-[11px] font-medium transition-colors ${
+              className={`flex h-14 items-center justify-center rounded-xl border-2 border-dashed text-xs font-medium transition-colors ${
                 snapshot.isDraggingOver
                   ? 'border-teal-400 bg-teal-50 text-teal-600'
                   : 'border-gray-200 text-gray-400'
@@ -97,6 +98,7 @@ function RowBlock({
   rowLayout,
   branding,
   index,
+  columnDragging,
   selection,
   dispatch,
 }: {
@@ -105,6 +107,7 @@ function RowBlock({
   rowLayout: RowLayout | undefined;
   branding: OfficePageContent['branding'];
   index: number;
+  columnDragging: boolean;
   selection: BuilderSelection;
   dispatch: Dispatch<BuilderAction>;
 }) {
@@ -114,8 +117,9 @@ function RowBlock({
   const template = rowTemplate(rowLayout, sections.length);
   const isTemplate = template !== 'columns';
   // Template rows lay out as a CSS grid (a column can span several stacked
-  // sections); their sections are reordered from the Row inspector rather than
-  // dragged, so intra-row drag is disabled to keep the grid stable.
+  // sections). Sections stay draggable here too — during a drag every non-dragged
+  // section is frozen and the placeholder is taken out of flow, so the grid never
+  // reflows; the drop just re-folds the row.
   const placement = isTemplate ? templatePlacement(template, sections.length) : null;
   const commitPair = (i: number, a: number, b: number) => {
     const next = [...spans];
@@ -150,11 +154,13 @@ function RowBlock({
             </span>
 
             <Droppable droppableId={`cols:${rowId}`} type="COLUMN" direction="horizontal">
-              {(dropProvided) => (
+              {(dropProvided, dropSnapshot) => (
                 <div
                   ref={dropProvided.innerRef}
                   {...dropProvided.droppableProps}
-                  className={isTemplate ? 'opl-tmpl-inner min-w-0 flex-1' : 'flex min-w-0 flex-1'}
+                  className={`${isTemplate ? 'opl-tmpl-inner min-w-0 flex-1' : 'flex min-w-0 flex-1'} relative rounded-2xl transition-shadow ${
+                    dropSnapshot.isDraggingOver ? 'ring-2 ring-inset ring-teal-300' : 'ring-0'
+                  }`}
                   style={
                     isTemplate && placement
                       ? ({
@@ -175,7 +181,7 @@ function RowBlock({
                       inRow={multi}
                       grow={isTemplate ? 1 : multi ? spans[colIndex] : 1}
                       templateCell={placement ? placement.cells[colIndex] : null}
-                      dragDisabled={isTemplate}
+                      columnDragging={columnDragging}
                       resize={
                         !isTemplate && multi && colIndex < sections.length - 1
                           ? {
@@ -189,7 +195,9 @@ function RowBlock({
                       dispatch={dispatch}
                     />
                   ))}
-                  {dropProvided.placeholder}
+                  {/* Keep the reorder placeholder out of flow: no section shifts or
+                      shrinks while you hover — the ring alone signals the merge. */}
+                  <div className="pointer-events-none absolute">{dropProvided.placeholder}</div>
                 </div>
               )}
             </Droppable>
@@ -207,7 +215,7 @@ function SectionColumn({
   inRow,
   grow,
   templateCell,
-  dragDisabled,
+  columnDragging,
   resize,
   selection,
   dispatch,
@@ -218,7 +226,7 @@ function SectionColumn({
   inRow: boolean;
   grow: number;
   templateCell: TemplateCell | null;
-  dragDisabled: boolean;
+  columnDragging: boolean;
   resize: { spanA: number; spanB: number; onCommit: (a: number, b: number) => void } | null;
   selection: BuilderSelection;
   dispatch: Dispatch<BuilderAction>;
@@ -234,18 +242,28 @@ function SectionColumn({
   const rendersEmpty = activeCount === 0 && section.type !== 'hero-cards';
 
   return (
-    <Draggable draggableId={`section:${section.key}`} index={index} isDragDisabled={dragDisabled}>
-      {(provided, snapshot) => (
+    <Draggable draggableId={`section:${section.key}`} index={index}>
+      {(provided, snapshot) => {
+        // While another section is being dragged, freeze this one: strip the
+        // reorder transform/transition dnd would apply so nothing slides around.
+        // Combined with the out-of-flow placeholder, the row stays put and only
+        // the drop-target ring moves.
+        const frozen = columnDragging && !snapshot.isDragging;
+        return (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          style={{ ...provided.draggableProps.style, ...placementStyle }}
+          style={{
+            ...provided.draggableProps.style,
+            ...placementStyle,
+            ...(frozen ? { transform: 'none', transition: 'none' } : null),
+          }}
           onClick={(e) => {
             e.stopPropagation();
             dispatch({ type: 'SELECT', selection: { kind: 'section', sectionKey: section.key } });
           }}
           title={section.title}
-          className={`group/section relative cursor-pointer rounded-2xl transition ${templateCell ? 'opl-cell' : ''} ${
+          className={`group/section relative cursor-pointer rounded-2xl transition-shadow ${templateCell ? 'opl-cell' : ''} ${
             selected ? 'ring-2 ring-teal-400' : 'ring-1 ring-transparent hover:ring-gray-200'
           } ${snapshot.isDragging ? 'bg-white shadow-xl ring-gray-200' : ''} ${section.visible ? '' : 'opacity-60'}`}
         >
@@ -262,22 +280,25 @@ function SectionColumn({
             </div>
           )}
 
+          {/* Whole-section drag handle: grab anywhere to move or combine into a row.
+              It covers the passive render (z-[1]) but sits below the toolbar (z-10)
+              and resize gutter (z-20), so those still receive their own clicks. A
+              plain click falls through to the wrapper's select handler. */}
+          <div
+            {...provided.dragHandleProps}
+            title="Drag to move · drop over another section to combine into a row"
+            aria-label={`Drag ${section.title}`}
+            className="absolute inset-0 z-[1] cursor-grab rounded-2xl outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-teal-300"
+          />
+
           {/* Floating editor chrome, over the passive render. */}
           <div
             className={`absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white/95 p-0.5 shadow-sm backdrop-blur transition-opacity ${
-              selected ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100'
+              selected
+                ? 'opacity-100'
+                : 'opacity-0 pointer-events-none group-hover/section:opacity-100 group-hover/section:pointer-events-auto'
             }`}
           >
-            {!dragDisabled && (
-              <span
-                {...provided.dragHandleProps}
-                onClick={(e) => e.stopPropagation()}
-                title="Drag to move, reorder, or combine into a row"
-                className="cursor-grab rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
-              >
-                <GripVertical size={15} />
-              </span>
-            )}
             {inRow && (
               <button
                 type="button"
@@ -317,7 +338,8 @@ function SectionColumn({
             </button>
           </div>
         </div>
-      )}
+        );
+      }}
     </Draggable>
   );
 }
