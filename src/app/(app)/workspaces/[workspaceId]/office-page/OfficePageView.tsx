@@ -1,34 +1,18 @@
 import type { ComponentType, ReactNode } from 'react';
 import {
-  BadgeDollarSign,
-  BookOpenText,
-  Bot,
-  Building2,
   Calendar,
-  CalendarDays,
   ChevronRight,
   ClipboardList,
   Clock,
-  Cloud,
-  FileSignature,
   FileText,
-  FolderOpen,
   Globe,
-  GraduationCap,
   LifeBuoy,
   Link2,
   Mail,
-  Megaphone,
-  MessagesSquare,
   Phone,
-  Repeat2,
-  Search,
-  ShieldCheck,
-  Signature,
-  Sparkles,
-  Trophy,
   Users,
 } from 'lucide-react';
+import { iconFor, type IconComponent } from './office-icons';
 import type {
   AnnouncementItem,
   EventItem,
@@ -109,49 +93,6 @@ function actionHref(action: OfficePageAction): string | null {
 
 function isExternal(href: string): boolean {
   return /^https?:\/\//.test(href);
-}
-
-type IconComponent = ComponentType<{ size?: number; className?: string }>;
-
-/**
- * Named icons an editor can attach to tools / announcements / resources via a
- * section item's `icon` field. Names (not glyphs) keep the content professional
- * and swappable; unknown names fall back gracefully at the call site.
- */
-const ICON_MAP: Record<string, IconComponent> = {
-  // quick-access tools
-  building: Building2,
-  search: Search,
-  'file-signature': FileSignature,
-  signature: Signature,
-  cloud: Cloud,
-  megaphone: Megaphone,
-  calendar: CalendarDays,
-  sparkles: Sparkles,
-  bot: Bot,
-  // announcements
-  clipboard: ClipboardList,
-  dollar: BadgeDollarSign,
-  message: MessagesSquare,
-  graduation: GraduationCap,
-  trophy: Trophy,
-  folder: FolderOpen,
-  // resources
-  business: FileText,
-  policies: BookOpenText,
-  marketing: Megaphone,
-  training: Repeat2,
-  success: Users,
-  hr: ShieldCheck,
-  document: FileText,
-  book: BookOpenText,
-  users: Users,
-  shield: ShieldCheck,
-};
-
-/** Resolve a named icon, or `undefined` if the name is empty/unknown (or a glyph). */
-function iconFor(name?: string): IconComponent | undefined {
-  return name ? ICON_MAP[name] : undefined;
 }
 
 function resourceIcon(name?: string): IconComponent {
