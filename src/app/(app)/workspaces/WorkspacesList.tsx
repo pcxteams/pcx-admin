@@ -27,6 +27,7 @@ interface ActiveWorkspace {
   primaryContactEmail: string;
   reportsToName: string | null;
   subscriptionPlan: string | null;
+  subscriptionAmount: number;
   seatLimit: number | null;
   billingStatus: string | null;
   memberCount: number;
@@ -34,6 +35,7 @@ interface ActiveWorkspace {
 
 interface WorkspacesData {
   total: number;
+  totalRevenue: number;
   pending: PendingWorkspace[];
   active: ActiveWorkspace[];
 }
@@ -182,16 +184,20 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
     <div className="space-y-8">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Workspaces', value: data.total },
-          { label: 'Pending Setup',    value: data.pending.length },
-          { label: 'Active',           value: data.active.length },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-100 px-6 py-5">
-            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">{label}</p>
-            <p className="text-3xl font-semibold text-gray-900">{value}</p>
-          </div>
-        ))}
+        <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
+          <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">Total Workspaces</p>
+          <p className="text-3xl font-semibold text-gray-900">{data.total}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
+          <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">Total Revenue</p>
+          <p className="text-3xl font-semibold text-gray-900">
+            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data.totalRevenue)}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 px-6 py-5">
+          <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">Active</p>
+          <p className="text-3xl font-semibold text-gray-900">{data.active.length}</p>
+        </div>
       </div>
 
       {/* Pending section */}
@@ -347,6 +353,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                   <th className={TH}>Primary Contact</th>
                   <th className={TH}>Reports To</th>
                   <th className={TH}>Plan</th>
+                  <th className={TH}>Monthly</th>
                   <th className={TH}>Users</th>
                 </tr>
               </thead>
@@ -371,6 +378,18 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                     </td>
                     <td className={TD}>{w.reportsToName ?? <span className="text-gray-400">—</span>}</td>
                     <td className={TD}><PlanBadge plan={w.subscriptionPlan} /></td>
+                    <td className={TD}>
+                      {w.subscriptionAmount > 0 ? (
+                        <span>
+                          <span className="font-medium text-gray-900">
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(w.subscriptionAmount)}
+                          </span>
+                          <span className="text-gray-400 text-xs ml-1">/mo</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className={TD}>
                       {w.seatLimit
                         ? `${w.memberCount} / ${w.seatLimit}`
