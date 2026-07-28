@@ -622,7 +622,7 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
                       type="button"
                       onClick={addLink}
                       disabled={!newLink.label.trim() || !newLink.url.trim()}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-white hover:border-gray-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-white hover:border-gray-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                     >
                       <Plus size={12} />
                       Add Link
