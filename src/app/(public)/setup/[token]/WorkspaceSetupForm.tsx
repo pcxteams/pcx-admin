@@ -39,7 +39,8 @@ function isValidUrl(value: string): boolean {
   if (!value.trim()) return true;
   try {
     const u = new URL(value.trim());
-    return u.protocol === 'https:' && u.hostname.includes('.');
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    return /\.[a-zA-Z]{2,}$/.test(u.hostname);
   } catch {
     return false;
   }
@@ -275,7 +276,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         const { [key]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [key]: 'Must be a valid https:// URL' };
+      return { ...prev, [key]: 'Must be a valid URL (e.g. https://example.com)' };
     });
   }
 
@@ -388,7 +389,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
     const newUrlErrors: Record<string, string> = {};
     for (const [key, val] of urlFields) {
       if (val.trim() && !isValidUrl(val)) {
-        newUrlErrors[key] = 'Must be a valid https:// URL';
+        newUrlErrors[key] = 'Must be a valid URL (e.g. https://example.com)';
       }
     }
     if (Object.keys(newUrlErrors).length > 0) {
