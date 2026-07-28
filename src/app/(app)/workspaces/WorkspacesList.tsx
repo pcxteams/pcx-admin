@@ -353,6 +353,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                   <th className={TH}>Primary Contact</th>
                   <th className={TH}>Reports To</th>
                   <th className={TH}>Plan</th>
+                  <th className={TH}>Monthly</th>
                   <th className={TH}>Users</th>
                 </tr>
               </thead>
@@ -377,6 +378,18 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                     </td>
                     <td className={TD}>{w.reportsToName ?? <span className="text-gray-400">—</span>}</td>
                     <td className={TD}><PlanBadge plan={w.subscriptionPlan} /></td>
+                    <td className={TD}>
+                      {w.subscriptionAmount > 0 ? (
+                        <span>
+                          <span className="font-medium text-gray-900">
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(w.subscriptionAmount)}
+                          </span>
+                          <span className="text-gray-400 text-xs ml-1">/mo</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className={TD}>
                       {w.seatLimit
                         ? `${w.memberCount} / ${w.seatLimit}`
