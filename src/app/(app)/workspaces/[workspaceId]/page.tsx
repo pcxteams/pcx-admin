@@ -1,0 +1,78 @@
+import { redirect, notFound } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { getSession } from '@/lib/session';
+import { apiGet } from '@/lib/api';
+import WorkspaceDetailView from './WorkspaceDetailView';
+
+export interface WorkspaceDetail {
+  id: string;
+  name: string;
+  clientFacingName: string | null;
+  type: 'office' | 'team';
+  status: string;
+  timeZone: string | null;
+  memberCount: number;
+  brandingConfig: {
+    logo_url?: string;
+    primary_color?: string;
+    secondary_color?: string;
+    address?: string;
+    website?: string;
+  } | null;
+  settingsConfig: {
+    mls_website?: string;
+    board_of_realtors_website?: string;
+    training_calendar_url?: string;
+    google_drive_url?: string;
+    additional_links?: { label: string; url: string }[];
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+  reportsTo: { id: string; name: string; type: 'office' | 'team' } | null;
+  primaryContact: { name: string; email: string };
+  billing: {
+    subscriptionPlan: string | null;
+    subscriptionAmount: number;
+    seatLimit: number | null;
+    billingStatus: string | null;
+  };
+  leaders: {
+    userId: string;
+    name: string;
+    email: string;
+    role: string;
+    phone: string | null;
+    jobTitle: string | null;
+    isActive: boolean;
+    lastActive: string;
+  }[];
+}
+
+export default async function WorkspaceDetailPage({
+  params,
+}: {
+  params: Promise<{ workspaceId: string }>;
+}) {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  if (session.user.role !== 'master') redirect('/workspaces');
+
+  const { workspaceId } = await params;
+  const data = await apiGet<WorkspaceDetail>(`/workspaces/${workspaceId}`);
+  if (!data) notFound();
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto">
+      <Link
+        href="/workspaces"
+        className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-6"
+      >
+        <ArrowLeft size={13} />
+        Back to workspaces
+      </Link>
+
+      <WorkspaceDetailView data={data} />
+    </div>
+  );
+}
