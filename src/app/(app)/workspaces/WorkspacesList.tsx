@@ -364,8 +364,12 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                   <tr key={w.id} className="hover:bg-gray-50 transition-colors">
                     <td className={TD}>
                       <div className="flex items-center gap-2.5">
-                        <WorkspaceIcon type={w.type} />
-                        <span className="font-medium text-gray-900">{w.name}</span>
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded shrink-0" style={{ color: '#009689' }}>
+                          {w.type === 'office' ? <Building2 size={13} /> : <Users size={13} />}
+                        </span>
+                        <Link href={`/workspaces/${w.id}`} className="font-medium hover:underline" style={{ color: '#009689' }}>
+                          {w.name}
+                        </Link>
                       </div>
                     </td>
                     <td className={TD}><TypeCell type={w.type} /></td>
