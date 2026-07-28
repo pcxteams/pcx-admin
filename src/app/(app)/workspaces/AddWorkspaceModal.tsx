@@ -53,6 +53,7 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [primaryEmail, setPrimaryEmail] = useState('');
   const [reportsTo, setReportsTo] = useState('');
   const [subscriptionPlan, setSubscriptionPlan] = useState<'essentials' | 'pro'>('essentials');
+  const [subscriptionAmount, setSubscriptionAmount] = useState('');
   const [userCount, setUserCount] = useState('1-10');
   const [cloneFrom, setCloneFrom] = useState<'pcx_master' | 'existing'>('pcx_master');
   const [cloneWorkspaceId, setCloneWorkspaceId] = useState('');
@@ -118,7 +119,9 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   }
 
   async function handleSubmit() {
+    const amountNum = parseFloat(subscriptionAmount);
     if (!workspaceName.trim() || !primaryName.trim() || !primaryEmail.trim()) return;
+    if (isNaN(amountNum) || amountNum <= 0) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -135,6 +138,7 @@ export default function AddWorkspaceModal({ onClose }: Props) {
           primaryContactEmail: primaryEmail.trim(),
           reportsToWorkspaceId: reportsTo || undefined,
           subscriptionPlan,
+          subscriptionAmount: parseFloat(subscriptionAmount),
           userCount,
           cloneFrom,
           cloneWorkspaceId: cloneFrom === 'existing' ? cloneWorkspaceId : undefined,
@@ -305,6 +309,25 @@ export default function AddWorkspaceModal({ onClose }: Props) {
             </div>
           </div>
 
+          {/* Subscription Amount */}
+          <div>
+            <label className={LABEL_CLASS}>
+              Subscription Amount ($/month) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={subscriptionAmount}
+                onChange={(e) => setSubscriptionAmount(e.target.value)}
+                placeholder="0.00"
+                className={`${INPUT_CLASS} pl-7`}
+              />
+            </div>
+          </div>
+
           {/* Clone From */}
           <div>
             <label className={LABEL_CLASS}>Clone From</label>
@@ -455,7 +478,7 @@ export default function AddWorkspaceModal({ onClose }: Props) {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || !workspaceName.trim() || !primaryName.trim() || !primaryEmail.trim()}
+            disabled={isSubmitting || !workspaceName.trim() || !primaryName.trim() || !primaryEmail.trim() || !(parseFloat(subscriptionAmount) > 0)}
             className="px-5 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Creating…' : 'Create & Send Form'}
