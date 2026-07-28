@@ -374,9 +374,19 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                     </td>
                     <td className={TD}><TypeCell type={w.type} /></td>
                     <td className={TD}>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600">
-                        Active
-                      </span>
+                      {w.billingStatus === 'suspended' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />Suspended
+                        </span>
+                      ) : w.status === 'archived' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />Archived
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />Active
+                        </span>
+                      )}
                     </td>
                     <td className={TD}>
                       <div className="font-medium text-gray-900 leading-tight">{w.primaryContactName}</div>

@@ -1,6 +1,4 @@
 import { redirect, notFound } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 import WorkspaceDetailView from './WorkspaceDetailView';
@@ -62,17 +60,5 @@ export default async function WorkspaceDetailPage({
   const data = await apiGet<WorkspaceDetail>(`/workspaces/${workspaceId}`);
   if (!data) notFound();
 
-  return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <Link
-        href="/workspaces"
-        className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-6"
-      >
-        <ArrowLeft size={13} />
-        Back to workspaces
-      </Link>
-
-      <WorkspaceDetailView data={data} />
-    </div>
-  );
+  return <WorkspaceDetailView data={data} />;
 }
