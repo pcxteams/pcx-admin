@@ -12,6 +12,7 @@ import type { RowLayout, RowTemplate } from '@/lib/office-page-content';
 import type { BuilderAction, BuilderSelection } from './builder-reducer';
 import { sectionMeta, type InspectorField } from './section-registry';
 import { groupSectionsIntoRows, sectionSpan, rowTemplate, templatePlacement } from './section-rows';
+import { ICON_OPTIONS, iconFor } from '../office-icons';
 
 const LABEL = 'block text-[11px] font-semibold tracking-wide text-gray-500 uppercase mb-1';
 const INPUT =
@@ -136,6 +137,42 @@ function FieldInput({
           onChange={(next) => onPatch({ [field.key]: next })}
         />
       );
+    case 'icon': {
+      const current = iconFor(typeof raw === 'string' ? raw : undefined);
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            title="No icon"
+            onClick={() => onPatch({ [field.key]: '' })}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border text-[9px] font-medium transition ${
+              !current ? 'border-gray-900 text-gray-700' : 'border-gray-200 text-gray-400 hover:border-gray-300'
+            }`}
+          >
+            None
+          </button>
+          {ICON_OPTIONS.map((opt) => {
+            const Icon = iconFor(opt.name)!;
+            const active = current === Icon;
+            return (
+              <button
+                key={opt.name}
+                type="button"
+                title={opt.label}
+                onClick={() => onPatch({ [field.key]: opt.name })}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                  active
+                    ? 'border-gray-900 text-gray-900 ring-1 ring-gray-300'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                <Icon size={16} />
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
     default:
       return (
         <input

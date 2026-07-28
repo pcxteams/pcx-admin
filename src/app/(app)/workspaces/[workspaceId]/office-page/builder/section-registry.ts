@@ -11,7 +11,7 @@ import type {
  * v3 content types (membership references, no brokerage/course action types).
  */
 
-export type InspectorFieldKind = 'text' | 'textarea' | 'boolean' | 'color' | 'action';
+export type InspectorFieldKind = 'text' | 'textarea' | 'boolean' | 'color' | 'action' | 'icon';
 
 export interface InspectorField {
   key: string;
@@ -35,6 +35,7 @@ const SUPPORT_ACTION_TYPES: OfficePageActionType[] = ['url', 'internal_page', 'e
 
 const COLOR_FIELD: InspectorField = { key: 'accentColor', label: 'Accent color', kind: 'color', swatches: ACCENT_COLORS };
 const TITLE_FIELD: InspectorField = { key: 'title', label: 'Title', kind: 'text' };
+const ICON_FIELD: InspectorField = { key: 'icon', label: 'Icon', kind: 'icon' };
 
 export interface SectionTypeMeta {
   label: string;
@@ -114,6 +115,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
     fields: [
       TITLE_FIELD,
       { key: 'subtitle', label: 'Subtitle', kind: 'text' },
+      ICON_FIELD,
       { key: 'action', label: 'Link action', kind: 'action', actionTypes: QUICK_LINK_ACTION_TYPES },
       COLOR_FIELD,
     ],
@@ -127,6 +129,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
     fields: [
       TITLE_FIELD,
       { key: 'description', label: 'Description', kind: 'textarea' },
+      ICON_FIELD,
       { key: 'date', label: 'Date', kind: 'text' },
       { key: 'category', label: 'Category', kind: 'text' },
       { key: 'imageUrl', label: 'Image URL', kind: 'text', placeholder: 'https://…' },
@@ -144,6 +147,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
     fields: [
       TITLE_FIELD,
       { key: 'description', label: 'Description', kind: 'textarea' },
+      ICON_FIELD,
       { key: 'category', label: 'Category', kind: 'text' },
       { key: 'action', label: 'Opens', kind: 'action', actionTypes: RESOURCE_ACTION_TYPES },
       COLOR_FIELD,
