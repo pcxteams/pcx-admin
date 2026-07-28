@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, CheckCircle, Copy, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, Building, CheckCircle, Copy, FileText } from 'lucide-react';
 import WorkspaceSubmissionModal from './WorkspaceSubmissionModal';
 
 interface PendingWorkspace {
@@ -355,6 +356,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                   <th className={TH}>Plan</th>
                   <th className={TH}>Monthly</th>
                   <th className={TH}>Users</th>
+                  <th className={TH}>Office Page</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -394,6 +396,15 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                       {w.seatLimit
                         ? `${w.memberCount} / ${w.seatLimit}`
                         : w.memberCount}
+                    </td>
+                    <td className={TD}>
+                      <Link
+                        href={`/workspaces/${w.id}/office-page`}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700"
+                      >
+                        <Building size={13} />
+                        Manage
+                      </Link>
                     </td>
                   </tr>
                 ))}
