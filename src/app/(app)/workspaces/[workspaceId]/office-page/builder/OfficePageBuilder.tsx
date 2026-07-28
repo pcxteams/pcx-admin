@@ -82,13 +82,6 @@ export default function OfficePageBuilder({
         toRowId,
         toIndex: destination.index,
       });
-      return;
-    }
-
-    if (type.startsWith('ITEM:')) {
-      if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-      const sectionKey = type.slice('ITEM:'.length);
-      dispatch({ type: 'MOVE_ITEM', sectionKey, fromIndex: source.index, toIndex: destination.index });
     }
   }, []);
 
@@ -167,7 +160,7 @@ export default function OfficePageBuilder({
   const btn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
-    <div className="p-6 max-w-7xl">
+    <div className="p-6 max-w-7xl mx-auto">
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">

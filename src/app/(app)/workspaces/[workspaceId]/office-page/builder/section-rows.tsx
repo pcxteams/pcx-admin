@@ -14,13 +14,13 @@ import type { OfficePageSection, RowLayout, RowTemplate } from '@/lib/office-pag
  * and the builder preview, keeping preview == published.
  */
 
-const ALIGN_CSS: Record<NonNullable<RowLayout['align']>, string> = {
+export const ALIGN_CSS: Record<NonNullable<RowLayout['align']>, string> = {
   start: 'flex-start',
   center: 'center',
   end: 'flex-end',
   stretch: 'stretch',
 };
-const GAP_CSS: Record<NonNullable<RowLayout['gap']>, string> = {
+export const GAP_CSS: Record<NonNullable<RowLayout['gap']>, string> = {
   sm: '0.75rem',
   md: '1.5rem',
   lg: '2.5rem',

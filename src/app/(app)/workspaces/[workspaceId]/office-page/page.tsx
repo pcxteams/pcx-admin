@@ -41,7 +41,7 @@ export default async function OfficePagePage({
   );
 
   return (
-    <div className="p-8 max-w-7xl">
+    <div className="p-8 max-w-7xl mx-auto">
       <Link
         href="/workspaces"
         className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-4"
