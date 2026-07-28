@@ -53,7 +53,7 @@ export type BuilderAction =
   | { type: 'UPDATE_SECTION'; sectionKey: string; patch: SectionPatch }
   | { type: 'TOGGLE_SECTION_VISIBLE'; sectionKey: string }
   | { type: 'MOVE_ROW'; fromIndex: number; toIndex: number }
-  | { type: 'MOVE_SECTION_ACROSS'; fromRowId: string; fromIndex: number; toRowId: string; toIndex: number }
+  | { type: 'MOVE_SECTION_ACROSS'; fromRowId: string; fromIndex: number; toRowId: string; toIndex: number; selection?: BuilderSelection }
   | { type: 'MOVE_SECTION_TO_NEW_ROW'; sectionKey: string; rowIndex: number }
   | { type: 'SPLIT_SECTION'; sectionKey: string }
   | { type: 'SET_ROW_SPANS'; rowId: string; spans: number[] }
@@ -317,7 +317,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       content.sections = groups
         .filter((group) => group.sections.length > 0)
         .flatMap((group) => group.sections);
-      return commit(state, content, { selection: { kind: 'section', sectionKey: moved.key } });
+      return commit(state, content, { selection: action.selection ?? { kind: 'section', sectionKey: moved.key } });
     }
 
     case 'MOVE_SECTION_TO_NEW_ROW': {

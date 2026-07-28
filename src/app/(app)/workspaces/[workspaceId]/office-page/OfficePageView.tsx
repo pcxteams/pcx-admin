@@ -637,7 +637,7 @@ function isShortcuts(section: OfficePageSection): boolean {
 }
 
 /** Render one section with its designed, type-specific card style. */
-function SectionBlock({
+export function SectionBlock({
   section,
   branding,
 }: {

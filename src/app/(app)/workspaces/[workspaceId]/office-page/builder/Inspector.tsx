@@ -1,6 +1,6 @@
 'use client';
 
-import { Trash2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, ChevronUp, ChevronDown, ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import type { Dispatch } from 'react';
 import type {
   OfficePageAction,
@@ -211,6 +211,12 @@ export default function Inspector({
   if (!section) return null;
 
   if (selection.kind === 'section') {
+    const meta = sectionMeta(section.type);
+    const noun = meta.itemNoun;
+    const count = section.items.length;
+    const moveItem = (from: number, to: number) =>
+      dispatch({ type: 'MOVE_ITEM', sectionKey: section.key, fromIndex: from, toIndex: to });
+
     return (
       <div className="space-y-4">
         <div>
@@ -244,19 +250,87 @@ export default function Inspector({
           />
           Visible on the agent page
         </label>
-        <div className="flex items-center gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'ADD_ITEM', sectionKey: section.key })}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600 text-white text-xs font-medium hover:bg-teal-700"
-          >
-            <Plus size={13} />
-            Add {sectionMeta(section.type).itemNoun}
-          </button>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className={LABEL}>{noun}s</span>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'ADD_ITEM', sectionKey: section.key })}
+              className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+            >
+              <Plus size={13} />
+              Add
+            </button>
+          </div>
+          <div className="space-y-1">
+            {count === 0 && (
+              <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-300">
+                No {noun}s yet.
+              </p>
+            )}
+            {section.items.map((item, i) => (
+              <div
+                key={item.id}
+                className={`flex items-center gap-1.5 rounded-lg border border-gray-100 px-2 py-1.5 ${
+                  item.active ? '' : 'opacity-50'
+                }`}
+              >
+                <span className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    disabled={i === 0}
+                    onClick={() => moveItem(i, i - 1)}
+                    title="Move up"
+                    className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ChevronUp size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={i === count - 1}
+                    onClick={() => moveItem(i, i + 1)}
+                    title="Move down"
+                    className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ChevronDown size={13} />
+                  </button>
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch({ type: 'SELECT', selection: { kind: 'item', sectionKey: section.key, itemId: item.id } })
+                  }
+                  className="min-w-0 flex-1 truncate text-left text-sm text-gray-700 hover:text-gray-950"
+                >
+                  {meta.itemTitle(item)}
+                </button>
+                <button
+                  type="button"
+                  title={item.active ? 'Hide' : 'Show'}
+                  onClick={() => dispatch({ type: 'TOGGLE_ITEM_ACTIVE', sectionKey: section.key, itemId: item.id })}
+                  className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                >
+                  {item.active ? <Eye size={13} /> : <EyeOff size={13} />}
+                </button>
+                <button
+                  type="button"
+                  title="Delete"
+                  onClick={() => dispatch({ type: 'REMOVE_ITEM', sectionKey: section.key, itemId: item.id })}
+                  className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-1">
           <button
             type="button"
             onClick={() => dispatch({ type: 'REMOVE_SECTION', sectionKey: section.key })}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-500 text-xs font-medium hover:bg-red-50"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50"
           >
             <Trash2 size={13} />
             Delete section
@@ -274,9 +348,15 @@ export default function Inspector({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-400">
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'SELECT', selection: { kind: 'section', sectionKey: section.key } })}
+          className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-800"
+          title={`Back to ${section.title}`}
+        >
+          <ChevronLeft size={13} />
           {meta.label} · {meta.itemNoun}
-        </span>
+        </button>
         <button
           type="button"
           onClick={() =>
@@ -412,7 +492,16 @@ function RowInspector({
 
   const setLayout = (patch: Partial<RowLayout>) => dispatch({ type: 'SET_ROW_LAYOUT', rowId, patch });
   const moveWithin = (fromIndex: number, toIndex: number) =>
-    dispatch({ type: 'MOVE_SECTION_ACROSS', fromRowId: rowId, fromIndex, toRowId: rowId, toIndex });
+    // Keep the row selected so the inspector stays put — otherwise selection flips
+    // to the moved section, which unmounts these buttons and refocuses the canvas.
+    dispatch({
+      type: 'MOVE_SECTION_ACROSS',
+      fromRowId: rowId,
+      fromIndex,
+      toRowId: rowId,
+      toIndex,
+      selection: { kind: 'row', rowId },
+    });
 
   return (
     <div className="space-y-5">

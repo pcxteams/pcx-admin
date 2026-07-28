@@ -2,19 +2,25 @@
 
 import { Fragment, useRef, useState, type CSSProperties, type Dispatch, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
-import { GripVertical, Eye, EyeOff, Plus, Rows2, Trash2 } from 'lucide-react';
-import type { OfficePageContent, OfficePageItem, OfficePageSection, RowLayout } from '@/lib/office-page-content';
+import { GripVertical, Eye, EyeOff, Rows2, Trash2 } from 'lucide-react';
+import type { OfficePageContent, OfficePageSection, RowLayout } from '@/lib/office-page-content';
 import type { BuilderAction, BuilderSelection } from './builder-reducer';
 import { sectionMeta } from './section-registry';
-import { groupSectionsIntoRows, sectionSpan, rowTemplate, templatePlacement, TemplateStyles, type TemplateCell } from './section-rows';
+import { groupSectionsIntoRows, sectionSpan, rowTemplate, templatePlacement, TemplateStyles, GAP_CSS, ALIGN_CSS, type TemplateCell } from './section-rows';
+import { SectionBlock } from '../OfficePageView';
 
 /**
  * WYSIWYG builder canvas with responsive rows (v2 Phase 6 port). Sections lay out
  * in rows — the outer list reorders rows (vertical DnD), each row reorders/receives
  * its columns (horizontal DnD, shared `COLUMN` type so a section drags between
- * rows), and each column reorders its items. Every DnD level is a 1-D list. Column
- * widths follow each section's `layout.span`; the responsive stack shows in Preview,
- * while the canvas keeps columns side by side for editing.
+ * rows). Every DnD level is a 1-D list. Column widths follow each section's
+ * `layout.span`; the responsive stack shows in Preview, while the canvas keeps
+ * columns side by side for editing.
+ *
+ * Each section renders its real, published-style content (the shared `SectionBlock`)
+ * so the canvas reads as the finished page. That render is passive
+ * (`pointer-events-none`); clicks fall through to select the section, and per-item
+ * editing lives in the Inspector. Selection/drag/hide/delete float as hover chrome.
  */
 export default function BuilderCanvas({
   content,
@@ -42,6 +48,7 @@ export default function BuilderCanvas({
                 rowId={row.rowId}
                 sections={row.sections}
                 rowLayout={content.rowLayouts?.[row.rowId]}
+                branding={content.branding}
                 index={index}
                 selection={selection}
                 dispatch={dispatch}
@@ -64,7 +71,7 @@ function NewRowLane({ index, active }: { index: number; active: boolean }) {
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`shrink-0 overflow-hidden transition-all ${active ? 'my-1 h-9' : 'h-3'}`}
+          className={`shrink-0 overflow-hidden transition-all ${active ? 'my-1 h-9' : 'h-6'}`}
         >
           {active && (
             <div
@@ -88,6 +95,7 @@ function RowBlock({
   rowId,
   sections,
   rowLayout,
+  branding,
   index,
   selection,
   dispatch,
@@ -95,6 +103,7 @@ function RowBlock({
   rowId: string;
   sections: OfficePageSection[];
   rowLayout: RowLayout | undefined;
+  branding: OfficePageContent['branding'];
   index: number;
   selection: BuilderSelection;
   dispatch: Dispatch<BuilderAction>;
@@ -145,17 +154,23 @@ function RowBlock({
                 <div
                   ref={dropProvided.innerRef}
                   {...dropProvided.droppableProps}
-                  className={isTemplate ? 'opl-tmpl-inner min-w-0 flex-1' : 'flex min-w-0 flex-1 items-stretch gap-3'}
+                  className={isTemplate ? 'opl-tmpl-inner min-w-0 flex-1' : 'flex min-w-0 flex-1'}
                   style={
                     isTemplate && placement
-                      ? ({ display: 'grid', gridTemplateColumns: placement.cols, gap: '0.75rem', alignItems: 'start' } as CSSProperties)
-                      : undefined
+                      ? ({
+                          display: 'grid',
+                          gridTemplateColumns: placement.cols,
+                          gap: GAP_CSS[rowLayout?.gap ?? 'md'],
+                          alignItems: ALIGN_CSS[rowLayout?.align ?? 'start'],
+                        } as CSSProperties)
+                      : ({ gap: GAP_CSS[rowLayout?.gap ?? 'md'], alignItems: ALIGN_CSS[rowLayout?.align ?? 'stretch'] } as CSSProperties)
                   }
                 >
                   {sections.map((section, colIndex) => (
                     <SectionColumn
                       key={section.key}
                       section={section}
+                      branding={branding}
                       index={colIndex}
                       inRow={multi}
                       grow={isTemplate ? 1 : multi ? spans[colIndex] : 1}
@@ -187,6 +202,7 @@ function RowBlock({
 
 function SectionColumn({
   section,
+  branding,
   index,
   inRow,
   grow,
@@ -197,6 +213,7 @@ function SectionColumn({
   dispatch,
 }: {
   section: OfficePageSection;
+  branding: OfficePageContent['branding'];
   index: number;
   inRow: boolean;
   grow: number;
@@ -211,6 +228,10 @@ function SectionColumn({
   const placementStyle: CSSProperties = templateCell
     ? { gridColumn: templateCell.gc, gridRow: templateCell.gr, minWidth: 0 }
     : { flexGrow: grow, flexBasis: 0, minWidth: 0 };
+  // Every renderer but the hero collapses to nothing without active items, so a
+  // section that would render blank gets a placeholder to stay selectable.
+  const activeCount = section.items.filter((it) => it.active).length;
+  const rendersEmpty = activeCount === 0 && section.type !== 'hero-cards';
 
   return (
     <Draggable draggableId={`section:${section.key}`} index={index} isDragDisabled={dragDisabled}>
@@ -219,114 +240,82 @@ function SectionColumn({
           ref={provided.innerRef}
           {...provided.draggableProps}
           style={{ ...provided.draggableProps.style, ...placementStyle }}
-          className={`group/section relative ${templateCell ? 'opl-cell' : ''} rounded-2xl border bg-white p-3 transition-colors ${
-            selected ? 'border-teal-400 ring-1 ring-teal-200' : 'border-gray-200 hover:border-gray-300'
-          } ${snapshot.isDragging ? 'shadow-xl' : ''} ${section.visible ? '' : 'opacity-70'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            dispatch({ type: 'SELECT', selection: { kind: 'section', sectionKey: section.key } });
+          }}
+          title={section.title}
+          className={`group/section relative cursor-pointer rounded-2xl transition ${templateCell ? 'opl-cell' : ''} ${
+            selected ? 'ring-2 ring-teal-400' : 'ring-1 ring-transparent hover:ring-gray-200'
+          } ${snapshot.isDragging ? 'bg-white shadow-xl ring-gray-200' : ''} ${section.visible ? '' : 'opacity-60'}`}
         >
           {resize && <ColumnGutter spanA={resize.spanA} spanB={resize.spanB} onCommit={resize.onCommit} />}
 
-          <div className="mb-2 flex items-center gap-2">
+          {/* The real, published render — passive so canvas clicks select the section. */}
+          <div className="pointer-events-none select-none">
+            <SectionBlock section={section} branding={branding} />
+          </div>
+
+          {rendersEmpty && (
+            <div className="pointer-events-none rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-xs text-gray-300">
+              Empty {meta.label} — add {meta.itemNoun}s in the panel
+            </div>
+          )}
+
+          {/* Floating editor chrome, over the passive render. */}
+          <div
+            className={`absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white/95 p-0.5 shadow-sm backdrop-blur transition-opacity ${
+              selected ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100'
+            }`}
+          >
             {!dragDisabled && (
               <span
                 {...provided.dragHandleProps}
+                onClick={(e) => e.stopPropagation()}
                 title="Drag to move, reorder, or combine into a row"
-                className="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+                className="cursor-grab rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
               >
-                <GripVertical size={16} />
+                <GripVertical size={15} />
               </span>
+            )}
+            {inRow && (
+              <button
+                type="button"
+                title="Move to its own row"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch({ type: 'SPLIT_SECTION', sectionKey: section.key });
+                }}
+                className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              >
+                <Rows2 size={15} />
+              </button>
             )}
             <button
               type="button"
+              title={section.visible ? 'Hide section' : 'Show section'}
               onClick={(e) => {
                 e.stopPropagation();
-                dispatch({ type: 'SELECT', selection: { kind: 'section', sectionKey: section.key } });
+                dispatch({ type: 'TOGGLE_SECTION_VISIBLE', sectionKey: section.key });
               }}
-              className="min-w-0 truncate text-sm font-semibold text-gray-800 hover:text-gray-950"
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
             >
-              {section.title}
+              {section.visible ? <Eye size={15} /> : <EyeOff size={15} />}
             </button>
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-gray-300">
-              {meta.label}
-            </span>
-            <div
-              className={`ml-auto flex shrink-0 items-center gap-0.5 transition-opacity ${
-                selected ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100'
-              }`}
+            <button
+              type="button"
+              title="Delete section"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (section.items.length === 0 || confirm(`Delete "${section.title}" and its ${section.items.length} ${meta.itemNoun}(s)?`)) {
+                  dispatch({ type: 'REMOVE_SECTION', sectionKey: section.key });
+                }
+              }}
+              className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
             >
-              {inRow && (
-                <button
-                  type="button"
-                  title="Move to its own row"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    dispatch({ type: 'SPLIT_SECTION', sectionKey: section.key });
-                  }}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                >
-                  <Rows2 size={15} />
-                </button>
-              )}
-              <button
-                type="button"
-                title={section.visible ? 'Hide section' : 'Show section'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  dispatch({ type: 'TOGGLE_SECTION_VISIBLE', sectionKey: section.key });
-                }}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-              >
-                {section.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-              <button
-                type="button"
-                title="Delete section"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (section.items.length === 0 || confirm(`Delete "${section.title}" and its ${section.items.length} ${meta.itemNoun}(s)?`)) {
-                    dispatch({ type: 'REMOVE_SECTION', sectionKey: section.key });
-                  }
-                }}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
+              <Trash2 size={15} />
+            </button>
           </div>
-
-          <Droppable droppableId={`items:${section.key}`} type={`ITEM:${section.key}`}>
-            {(dropProvided) => (
-              <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-1.5">
-                {section.items.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-300">
-                    No {meta.itemNoun}s yet.
-                  </p>
-                )}
-                {section.items.map((item, itemIndex) => (
-                  <EditableItem
-                    key={item.id}
-                    section={section}
-                    item={item}
-                    index={itemIndex}
-                    selected={selection.kind === 'item' && selection.itemId === item.id}
-                    dispatch={dispatch}
-                  />
-                ))}
-                {dropProvided.placeholder}
-              </div>
-            )}
-          </Droppable>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              dispatch({ type: 'ADD_ITEM', sectionKey: section.key });
-            }}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-200 py-1.5 text-xs text-gray-400 hover:border-teal-300 hover:text-teal-600"
-          >
-            <Plus size={13} />
-            Add {meta.itemNoun}
-          </button>
         </div>
       )}
     </Draggable>
@@ -427,68 +416,3 @@ function ColumnGutter({
   );
 }
 
-function EditableItem({
-  section,
-  item,
-  index,
-  selected,
-  dispatch,
-}: {
-  section: OfficePageSection;
-  item: OfficePageItem;
-  index: number;
-  selected: boolean;
-  dispatch: Dispatch<BuilderAction>;
-}) {
-  const meta = sectionMeta(section.type);
-  return (
-    <Draggable draggableId={`item:${section.key}:${item.id}`} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch({ type: 'SELECT', selection: { kind: 'item', sectionKey: section.key, itemId: item.id } });
-          }}
-          className={`group/item flex items-center gap-2 rounded-lg border px-2.5 py-2 bg-white cursor-pointer ${
-            selected ? 'border-teal-400 ring-1 ring-teal-200' : 'border-gray-100 hover:border-gray-200'
-          } ${snapshot.isDragging ? 'shadow-md' : ''} ${item.active ? '' : 'opacity-50'}`}
-        >
-          <span
-            {...provided.dragHandleProps}
-            className="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical size={14} />
-          </span>
-          <span className="flex-1 truncate text-sm text-gray-700">{meta.itemTitle(item)}</span>
-          <div className={`flex shrink-0 items-center gap-0.5 ${selected ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'}`}>
-            <button
-              type="button"
-              title={item.active ? 'Hide item' : 'Show item'}
-              onClick={(e) => {
-                e.stopPropagation();
-                dispatch({ type: 'TOGGLE_ITEM_ACTIVE', sectionKey: section.key, itemId: item.id });
-              }}
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            >
-              {item.active ? <Eye size={13} /> : <EyeOff size={13} />}
-            </button>
-            <button
-              type="button"
-              title="Delete item"
-              onClick={(e) => {
-                e.stopPropagation();
-                dispatch({ type: 'REMOVE_ITEM', sectionKey: section.key, itemId: item.id });
-              }}
-              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        </div>
-      )}
-    </Draggable>
-  );
-}
