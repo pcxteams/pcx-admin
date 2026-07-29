@@ -374,7 +374,9 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
                 <button
                   type="button"
                   onClick={() => setChangeReportsTo(true)}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                  disabled={data.type === 'office'}
+                  title={data.type === 'office' ? 'Offices do not report to other workspaces.' : undefined}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-200"
                 >
                   Change Reporting Relationship
                 </button>
@@ -389,11 +391,15 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
             </div>
           ) : (
             <div className="flex items-center gap-4">
-              <p className="text-sm text-gray-400 flex-1">No reporting relationship assigned.</p>
+              <p className="text-sm text-gray-400 flex-1">
+                {data.type === 'office' ? 'Offices do not report to other workspaces.' : 'No reporting relationship assigned.'}
+              </p>
               <button
                 type="button"
                 onClick={() => setChangeReportsTo(true)}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors shrink-0"
+                disabled={data.type === 'office'}
+                title={data.type === 'office' ? 'Offices do not report to other workspaces.' : undefined}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-200"
               >
                 Set Reporting Relationship
               </button>
