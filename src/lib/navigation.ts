@@ -33,9 +33,9 @@ export const navigation: NavSection[] = [
     ],
   },
   {
-    section: 'TEAM',
+    section: 'ENGAGEMENT',
     items: [
-      { label: 'Team', href: '/team', icon: 'Users' },
+      { label: 'Users', href: '/team', icon: 'Users' },
       { label: 'Assignments', href: '/team/assignments', icon: 'ClipboardList' },
       { label: 'Communications', href: '/team/communications', icon: 'MessageSquare' },
     ],
