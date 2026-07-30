@@ -112,6 +112,10 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('workspaces.showArchived') === 'true';
+  });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [submissionTarget, setSubmissionTarget] = useState<PendingWorkspace | null>(null);
   const [activateTarget, setActivateTarget] = useState<PendingWorkspace | null>(null);
@@ -171,15 +175,24 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
     }
   }
 
-  const filteredActive = data.active.filter((w) => {
-    const matchesSearch =
-      !search ||
-      w.name.toLowerCase().includes(search.toLowerCase()) ||
-      w.primaryContactName.toLowerCase().includes(search.toLowerCase());
-    const matchesType = typeFilter === 'all' || w.type === typeFilter;
-    const matchesPlan = planFilter === 'all' || w.subscriptionPlan === planFilter;
-    return matchesSearch && matchesType && matchesPlan;
-  });
+  function statusRank(w: ActiveWorkspace): number {
+    if (w.billingStatus === 'suspended') return 0;
+    if (w.status === 'archived') return 1;
+    return 2;
+  }
+
+  const filteredActive = data.active
+    .filter((w) => {
+      if (!showArchived && w.status === 'archived') return false;
+      const matchesSearch =
+        !search ||
+        w.name.toLowerCase().includes(search.toLowerCase()) ||
+        w.primaryContactName.toLowerCase().includes(search.toLowerCase());
+      const matchesType = typeFilter === 'all' || w.type === typeFilter;
+      const matchesPlan = planFilter === 'all' || w.subscriptionPlan === planFilter;
+      return matchesSearch && matchesType && matchesPlan;
+    })
+    .sort((a, b) => statusRank(a) - statusRank(b));
 
   return (
     <div className="space-y-8">
@@ -336,6 +349,18 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-500 hover:text-gray-700">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => {
+                setShowArchived(e.target.checked);
+                localStorage.setItem('workspaces.showArchived', String(e.target.checked));
+              }}
+              className="accent-teal-600 w-3.5 h-3.5"
+            />
+            Show Archived
+          </label>
           <span className="ml-auto text-xs text-gray-400">{filteredActive.length} workspace{filteredActive.length !== 1 ? 's' : ''}</span>
         </div>
 

@@ -661,11 +661,11 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
           </div>
         </div>
 
-        {/* PCx Admin Only */}
+        {/* PCx Master Only */}
         <div className="rounded-xl border border-red-200 bg-red-50/40 p-6">
           <div className="flex items-center gap-2 mb-1">
             <AlertTriangle size={15} className="text-red-500" />
-            <p className="text-base font-semibold text-red-700">PCx Admin Only</p>
+            <p className="text-base font-semibold text-red-700">PCx Master Only</p>
           </div>
           <p className="text-sm text-red-500 mb-5">These actions permanently affect this Workspace.</p>
           <div className="flex items-center gap-3">
