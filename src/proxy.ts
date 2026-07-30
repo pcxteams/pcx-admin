@@ -8,8 +8,9 @@ const SESSION_COOKIE = 'better-auth.session_token';
 
 function isPublic(pathname: string): boolean {
   if (pathname === '/login') return true;
-  // Setup form is the one public-facing page — no login required.
+  // Setup form page and its backing API endpoints are public — no session required.
   if (pathname.startsWith('/setup/')) return true;
+  if (pathname.startsWith('/api/workspace-setup/')) return true;
   return false;
 }
 
