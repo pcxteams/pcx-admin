@@ -6,18 +6,28 @@ import type { NextRequest } from 'next/server';
 // happens in the (app) layout via getSession(). Mirrors v2's proxy.ts.
 const SESSION_COOKIE = 'better-auth.session_token';
 
-// Exact-match public pages that don't require a session.
-const PUBLIC_PATHS = ['/login'];
+function isPublic(pathname: string): boolean {
+  if (pathname === '/login') return true;
+  // Setup form is the one public-facing page — no login required.
+  if (pathname.startsWith('/setup/')) return true;
+  return false;
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Inject the pathname so server layouts can read it via headers().
+  // Used by (app)/layout.tsx to skip auth for /setup/* if the catch-all
+  // route group happens to intercept those public paths.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
+
   const hasSession = Boolean(
     request.cookies.get(SESSION_COOKIE)?.value ??
       request.cookies.get(`__Secure-${SESSION_COOKIE}`)?.value,
   );
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p);
 
-  if (!hasSession && !isPublic) {
+  if (!hasSession && !isPublic(pathname)) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -28,7 +38,7 @@ export function proxy(request: NextRequest) {
   // briefly unreachable), the two guards would ping-pong forever
   // (ERR_TOO_MANY_REDIRECTS), hard-locking the user out. Always letting /login
   // render lets a user with a dead session sign in again.
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {
