@@ -452,10 +452,10 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
           <div className="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-5">
             <CheckCircle size={28} className="text-teal-600" />
           </div>
-          <h1 className="text-lg font-semibold text-gray-900 mb-2">Workspace submitted!</h1>
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">You're All Set!</h1>
           <p className="text-sm text-gray-500">
-            Your workspace setup has been submitted. Our team will review and activate it shortly.
-            You can close this tab.
+            Your workspace setup has been submitted. 
+            We'll begin setting up your workspace and creating your account.
           </p>
         </div>
       </div>
