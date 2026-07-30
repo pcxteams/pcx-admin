@@ -5,15 +5,6 @@ import { useRouter } from 'next/navigation';
 import { X, LayoutGrid, Users, Info } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
-const ALL_WORKSPACES = [
-  { id: '1', label: 'Keller Williams Realty' },
-  { id: '2', label: 'RE/MAX Premier' },
-  { id: '3', label: 'Sunbelt Realty Group' },
-  { id: '4', label: 'Mesa Valley Realty' },
-  { id: '5', label: 'Desert Peak Offices' },
-  { id: '6', label: 'Pinnacle AZ Brokers' },
-];
-
 const USER_COUNT_OPTIONS = [
   { id: '1-10', label: '1–10' },
   { id: '11-25', label: '11–25' },
@@ -23,9 +14,6 @@ const USER_COUNT_OPTIONS = [
   { id: '251-500', label: '251–500' },
   { id: '500+', label: '500+' },
 ];
-
-const DEFAULT_EMAIL_BODY =
-  "Please complete the Workspace Setup Form to finish setting up your account. Once completed, you'll have full access to your PCx workspace. Workspace managers will also receive the setup form.";
 
 const INPUT_CLASS =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent';
@@ -42,6 +30,23 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
+function firstAndLast(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 2) return parts.join(' ');
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+function buildDefaultBody(name: string) {
+  const displayName = name.trim() ? firstAndLast(name) : '[Manager Name]';
+  return (
+    `Hi {{username}},\n\n` +
+    `Please complete this form to finish setting up your workspace:\n\n` +
+    `Workspace Setup Form\n\n` +
+    `${displayName} is the only user account created automatically. All other leaders who need access must be included in this form.\n\n` +
+    `Thank you,`
+  );
+}
+
 interface Props {
   onClose: () => void;
 }
@@ -55,10 +60,9 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [subscriptionPlan, setSubscriptionPlan] = useState<'essentials' | 'pro'>('essentials');
   const [subscriptionAmount, setSubscriptionAmount] = useState('');
   const [userCount, setUserCount] = useState('1-10');
-  const [cloneFrom, setCloneFrom] = useState<'pcx_master' | 'existing'>('pcx_master');
-  const [cloneWorkspaceId, setCloneWorkspaceId] = useState('');
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
-  const [emailBody, setEmailBody] = useState(DEFAULT_EMAIL_BODY);
+  const [emailBody, setEmailBody] = useState(() => buildDefaultBody(''));
+  const [hasCustomBody, setHasCustomBody] = useState(false);
   const [emailInput, setEmailInput] = useState('');
 
   const [officeWorkspaces, setOfficeWorkspaces] = useState<{ id: string; label: string }[]>([]);
@@ -68,6 +72,12 @@ export default function AddWorkspaceModal({ onClose }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const emailInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!hasCustomBody) {
+      setEmailBody(buildDefaultBody(primaryName));
+    }
+  }, [primaryName, hasCustomBody]);
 
   useEffect(() => {
     async function fetchOfficeWorkspaces() {
@@ -140,8 +150,6 @@ export default function AddWorkspaceModal({ onClose }: Props) {
           subscriptionPlan,
           subscriptionAmount: parseFloat(subscriptionAmount),
           userCount,
-          cloneFrom,
-          cloneWorkspaceId: cloneFrom === 'existing' ? cloneWorkspaceId : undefined,
           emailRecipients,
           emailBody,
         }),
@@ -235,9 +243,9 @@ export default function AddWorkspaceModal({ onClose }: Props) {
             </div>
           </div>
 
-          {/* Primary Contact */}
+          {/* Manager (Primary Contact) */}
           <div>
-            <p className={SECTION_LABEL_CLASS}>Primary Contact</p>
+            <p className={SECTION_LABEL_CLASS}>MANAGER (Primary Contact)</p>
             <div className="space-y-3">
               <div>
                 <label className={LABEL_CLASS}>
@@ -328,54 +336,6 @@ export default function AddWorkspaceModal({ onClose }: Props) {
             </div>
           </div>
 
-          {/* Clone From */}
-          <div>
-            <label className={LABEL_CLASS}>Clone From</label>
-            <div className="space-y-2">
-              {/* PCX Master radio */}
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="cloneFrom"
-                  value="pcx_master"
-                  checked={cloneFrom === 'pcx_master'}
-                  onChange={() => {
-                    setCloneFrom('pcx_master');
-                    setCloneWorkspaceId('');
-                  }}
-                  className="accent-teal-600"
-                />
-                <span className="text-sm text-gray-700">PCX Master</span>
-              </label>
-
-              {/* Existing Workspace radio */}
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="cloneFrom"
-                  value="existing"
-                  checked={cloneFrom === 'existing'}
-                  onChange={() => setCloneFrom('existing')}
-                  className="accent-teal-600"
-                />
-                <span className="text-sm text-gray-700">Existing Workspace</span>
-              </label>
-
-              {/* Searchable select shown below 'Existing Workspace' when selected */}
-              {cloneFrom === 'existing' && (
-                <div className="pl-6">
-                  <SearchableSelect
-                    options={ALL_WORKSPACES}
-                    value={cloneWorkspaceId}
-                    onChange={setCloneWorkspaceId}
-                    placeholder="Search workspaces…"
-                  />
-                </div>
-              )}
-
-            </div>
-          </div>
-
           {/* Setup Form Email */}
           <div>
             <p className={SECTION_LABEL_CLASS}>Setup Form Email</p>
@@ -452,11 +412,17 @@ export default function AddWorkspaceModal({ onClose }: Props) {
             {/* Body textarea */}
             <div>
               <label className={LABEL_CLASS}>Body</label>
+              <p className="mb-1 text-xs text-gray-400">
+                <code className="bg-gray-100 px-1 rounded">{'{{username}}'}</code> is replaced with the first part of each recipient&apos;s email address.
+              </p>
               <textarea
                 value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                rows={4}
-                className={`${INPUT_CLASS} min-h-[100px] resize-y`}
+                onChange={(e) => {
+                  setHasCustomBody(true);
+                  setEmailBody(e.target.value);
+                }}
+                rows={8}
+                className={`${INPUT_CLASS} min-h-[120px] resize-y font-mono text-xs`}
               />
             </div>
           </div>
