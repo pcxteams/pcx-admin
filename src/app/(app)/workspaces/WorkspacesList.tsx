@@ -134,7 +134,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
     setIsActivating(true);
     setActivateError(null);
     try {
-      const res = await fetch(`/api/workspaces/${activateTarget.id}/activate`, {
+      const res = await fetch(`/api/workspaces/${activateTarget.id}/complete-setup`, {
         method: 'POST',
         credentials: 'include',
       });
