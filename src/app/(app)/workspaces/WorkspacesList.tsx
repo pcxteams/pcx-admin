@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, Building, CheckCircle, Copy, FileText } from 'lucide-react';
+import { Building2, Users, Send, Eye, FileCheck, Clock, ChevronDown, AlertTriangle, X, Building, CheckCircle, Copy, FileText, FolderOpen } from 'lucide-react';
 import WorkspaceSubmissionModal from './WorkspaceSubmissionModal';
 
 interface PendingWorkspace {
@@ -382,6 +382,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                   <th className={TH}>Monthly</th>
                   <th className={TH}>Users</th>
                   <th className={TH}>Office Page</th>
+                  <th className={TH}>Content</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -442,6 +443,15 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700"
                       >
                         <Building size={13} />
+                        Manage
+                      </Link>
+                    </td>
+                    <td className={TD}>
+                      <Link
+                        href={`/workspaces/${w.id}/content-manager`}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700"
+                      >
+                        <FolderOpen size={13} />
                         Manage
                       </Link>
                     </td>
