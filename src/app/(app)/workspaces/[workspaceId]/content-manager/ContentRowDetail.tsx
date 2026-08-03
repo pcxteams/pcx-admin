@@ -5,8 +5,9 @@ import {
   Play, Download, ExternalLink, CornerDownRight, PencilLine, Loader2,
 } from 'lucide-react';
 import {
-  TYPE_META, formatDate, estTimeLabel,
-  type ContentItemDetail, type VideoConfig, type ExternalLinkConfig, type ResourceConfig,
+  TYPE_META, formatDate, estTimeLabel, verificationTypeLabel, LEADER_ACTION_LABEL,
+  type ContentItemDetail, type ExternalLinkConfig, type ResourceConfig,
+  type LeaderVerificationConfig,
 } from '@/lib/content';
 import { TypeIcon } from './content-icons';
 
@@ -63,6 +64,27 @@ export default function ContentRowDetail({
             <p className={LABEL}>Content Type</p>
             <p className="text-sm text-teal-700 font-medium mt-1">{meta.label}</p>
           </div>
+
+          {detail.type === 'leader_verification' && (
+            <>
+              <div>
+                <p className={LABEL}>Verification Type</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {verificationTypeLabel((detail.config as LeaderVerificationConfig).verificationType)}
+                </p>
+              </div>
+              <div>
+                <p className={LABEL}>Leader Actions</p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {((detail.config as LeaderVerificationConfig).leaderActions ?? []).map((a) => (
+                    <span key={a} className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-xs text-gray-600">
+                      {LEADER_ACTION_LABEL[a] ?? a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {detail.tags.length > 0 && (
             <div>
@@ -178,7 +200,6 @@ function Preview({
   const meta = TYPE_META[detail.type];
 
   if (detail.type === 'video') {
-    const cfg = detail.config as VideoConfig;
     return (
       <div className="shrink-0">
         <div className="w-56 h-32 rounded-lg bg-slate-800 flex items-center justify-center">
@@ -187,18 +208,7 @@ function Preview({
           </span>
         </div>
         <div className="mt-2">
-          {cfg.source === 'embed' && cfg.url ? (
-            <a
-              href={cfg.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700"
-            >
-              <ExternalLink size={12} /> Open video
-            </a>
-          ) : (
-            <DownloadButton downloading={downloading} onDownload={onDownload} label="Download video" />
-          )}
+          <DownloadButton downloading={downloading} onDownload={onDownload} label="Download video" />
         </div>
       </div>
     );
@@ -239,7 +249,7 @@ function Preview({
     );
   }
 
-  // form / quiz — icon tile
+  // leader_verification — icon tile
   return (
     <div className="shrink-0">
       <div className={`w-56 h-32 rounded-lg ${meta.iconBg} flex items-center justify-center`}>

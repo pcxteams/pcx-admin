@@ -1,12 +1,11 @@
-import { Video, FileText, Link2, ClipboardList, CircleHelp, type LucideIcon } from 'lucide-react';
+import { Video, FileText, Link2, ShieldCheck, type LucideIcon } from 'lucide-react';
 import type { ContentType } from '@/lib/content';
 
 export const TYPE_ICON: Record<ContentType, LucideIcon> = {
   video: Video,
   resource: FileText,
   external_link: Link2,
-  form: ClipboardList,
-  quiz: CircleHelp,
+  leader_verification: ShieldCheck,
 };
 
 /** Rounded icon tile used in table rows, detail panels, and related-content lists. */
