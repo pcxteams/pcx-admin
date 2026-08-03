@@ -668,6 +668,22 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
             <p className="text-base font-semibold text-red-700">PCx Master Only</p>
           </div>
           <p className="text-sm text-red-500 mb-5">These actions permanently affect this Workspace.</p>
+          {data.status === 'setup_submitted' && (
+            <div className="mb-5 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  setActionError(null);
+                  if (await doAction('complete-setup', 'POST')) router.refresh();
+                }}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-teal-400 bg-teal-50 text-sm font-medium text-teal-700 hover:bg-teal-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Complete Setup &amp; Send Activation Email
+              </button>
+              {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <button
               type="button"
