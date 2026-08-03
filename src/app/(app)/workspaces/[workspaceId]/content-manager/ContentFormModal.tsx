@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Upload, Plus, Trash2, Loader2, FileText } from 'lucide-react';
+import { X, Upload, Loader2, FileText } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, TYPE_META, RESOURCE_ACCEPT, VIDEO_ACCEPT,
+  LEADER_VERIFICATION_TYPES,
   type ContentType, type ContentStatus, type ContentItemDetail,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig,
-  type FormConfig, type QuizConfig,
+  type LeaderVerificationConfig,
 } from '@/lib/content';
 
 const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -15,12 +16,6 @@ const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500 MB
 const LABEL = 'block text-xs font-medium text-gray-600 mb-1.5';
 const INPUT =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent';
-
-function genId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `id-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-}
 
 export default function ContentFormModal({
   workspaceId, mode, type, item, onClose, onSaved,
@@ -40,13 +35,8 @@ export default function ContentFormModal({
   const [tags, setTags] = useState<string[]>(item?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
   const [status, setStatus] = useState<ContentStatus>(item?.status ?? 'draft');
-  const [estTime, setEstTime] = useState(item?.estTimeMinutes?.toString() ?? '');
+  const [estTime, setEstTime] = useState(item?.estTime ?? '');
 
-  const initialVideo = (item?.config as VideoConfig) ?? {};
-  const [videoSource, setVideoSource] = useState<'embed' | 'upload'>(
-    type === 'video' ? (initialVideo.source ?? 'embed') : 'embed',
-  );
-  const [videoUrl, setVideoUrl] = useState(initialVideo.url ?? '');
   const [linkUrl, setLinkUrl] = useState((item?.config as ExternalLinkConfig)?.url ?? '');
 
   const [file, setFile] = useState<File | null>(null);
@@ -54,11 +44,9 @@ export default function ContentFormModal({
     (item?.config as ResourceConfig | VideoConfig)?.fileName ?? null,
   );
 
-  const [fields, setFields] = useState<FormConfig['fields']>(
-    ((item?.config as FormConfig)?.fields ?? []).map((f) => ({ ...f })),
-  );
-  const [questions, setQuestions] = useState<QuizConfig['questions']>(
-    ((item?.config as QuizConfig)?.questions ?? []).map((q) => ({ ...q })),
+  const [verificationType, setVerificationType] = useState<string>(
+    (item?.config as LeaderVerificationConfig)?.verificationType ??
+      LEADER_VERIFICATION_TYPES[0].value,
   );
 
   const [saving, setSaving] = useState(false);
@@ -137,19 +125,17 @@ export default function ContentFormModal({
       case 'external_link':
         return { url: linkUrl.trim() };
       case 'video':
-        if (videoSource === 'embed') return { source: 'embed', url: videoUrl.trim() };
         if (file) {
           const up = await uploadFile(file);
           return {
-            source: 'upload',
             fileKey: up.fileKey,
             fileName: up.fileName,
             mimeType: file.type,
             fileSizeBytes: file.size,
           };
         }
-        // keep existing uploaded file on edit
-        return { ...(item?.config as VideoConfig), source: 'upload' };
+        // keep the existing uploaded file on edit
+        return { ...(item?.config as VideoConfig) };
       case 'resource':
         if (file) {
           const up = await uploadFile(file);
@@ -161,22 +147,24 @@ export default function ContentFormModal({
           };
         }
         return { ...(item?.config as ResourceConfig) };
-      case 'form':
-        return { fields: fields.filter((f) => f.label.trim()) };
-      case 'quiz':
-        return { questions: questions.filter((q) => q.prompt.trim()) };
+      case 'leader_verification':
+        return { verificationType, leaderActions: ['approve', 'reject'] };
     }
   }
 
   function clientValidate(): string | null {
     if (!title.trim()) return 'Title is required.';
-    if (type === 'external_link' && !linkUrl.trim()) return 'A URL is required.';
-    if (type === 'video' && videoSource === 'embed' && !videoUrl.trim())
-      return 'A video URL is required.';
-    if (type === 'video' && videoSource === 'upload' && !file && !existingFileName)
+    if (type === 'external_link') {
+      if (!linkUrl.trim()) return 'A URL is required.';
+      if (!/^https?:\/\//i.test(linkUrl.trim()))
+        return 'The URL must start with http:// or https://.';
+    }
+    if (type === 'video' && !file && !existingFileName)
       return 'Please choose a video file to upload.';
     if (type === 'resource' && !file && !existingFileName)
       return 'Please choose a file to upload.';
+    if (type === 'leader_verification' && !verificationType)
+      return 'A verification type is required.';
     return null;
   }
 
@@ -197,8 +185,7 @@ export default function ContentFormModal({
         tags,
         status,
         config,
-        estTimeMinutes:
-          type === 'video' && estTime.trim() ? Number.parseInt(estTime, 10) : null,
+        estTime: estTime.trim() || null,
         relatedContentIds: item?.relatedContentIds ?? [],
       };
       if (mode === 'create') payload.type = type;
@@ -229,6 +216,8 @@ export default function ContentFormModal({
 
   /* -------------------------------------------------------------- render */
 
+  const isLeaderVerification = type === 'leader_verification';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
@@ -255,23 +244,31 @@ export default function ContentFormModal({
           </div>
 
           <div>
-            <label className={LABEL}>Description</label>
+            <label className={LABEL}>
+              {isLeaderVerification ? 'Description / Instructions' : 'Description'}
+            </label>
             <textarea
               className={`${INPUT} resize-none`}
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description"
+              placeholder={
+                isLeaderVerification
+                  ? 'What should the leader do to verify this?'
+                  : 'Optional description'
+              }
             />
           </div>
 
           {/* Type-specific */}
           {type === 'video' && (
-            <VideoFields
-              source={videoSource} setSource={setVideoSource}
-              url={videoUrl} setUrl={setVideoUrl}
-              estTime={estTime} setEstTime={setEstTime}
-              existingFileName={existingFileName} onFileChange={onFileChange}
+            <FileField
+              label="Video file"
+              required
+              accept={VIDEO_ACCEPT}
+              existingFileName={existingFileName}
+              onFileChange={onFileChange}
+              hint="Uploaded and stored privately in this workspace — never an external embed."
             />
           )}
 
@@ -294,31 +291,43 @@ export default function ContentFormModal({
             />
           )}
 
-          {type === 'form' && (
-            <RepeatableList
-              label="Fields"
-              addLabel="Add field"
-              items={fields.map((f) => ({ id: f.id, value: f.label }))}
-              onAdd={() => setFields([...fields, { id: genId(), label: '', type: 'text' }])}
-              onChange={(id, v) => setFields(fields.map((f) => (f.id === id ? { ...f, label: v } : f)))}
-              onRemove={(id) => setFields(fields.filter((f) => f.id !== id))}
-              placeholder="Field label"
-              emptyHint="No fields yet. A full form builder is coming later."
-            />
+          {type === 'leader_verification' && (
+            <div className="space-y-4">
+              <div>
+                <label className={LABEL}>Verification Type <span className="text-red-500">*</span></label>
+                <select
+                  className={INPUT}
+                  value={verificationType}
+                  onChange={(e) => setVerificationType(e.target.value)}
+                >
+                  {LEADER_VERIFICATION_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={LABEL}>Leader Actions</label>
+                <div className="flex gap-2">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-green-50 text-green-600 text-xs font-medium">Approve</span>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-red-50 text-red-500 text-xs font-medium">Reject</span>
+                </div>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  The leader can approve or reject. The task that triggers this verification is configured in the Builder.
+                </p>
+              </div>
+            </div>
           )}
 
-          {type === 'quiz' && (
-            <RepeatableList
-              label="Questions"
-              addLabel="Add question"
-              items={questions.map((q) => ({ id: q.id, value: q.prompt }))}
-              onAdd={() => setQuestions([...questions, { id: genId(), prompt: '' }])}
-              onChange={(id, v) => setQuestions(questions.map((q) => (q.id === id ? { ...q, prompt: v } : q)))}
-              onRemove={(id) => setQuestions(questions.filter((q) => q.id !== id))}
-              placeholder="Question prompt"
-              emptyHint="No questions yet. A full quiz builder is coming later."
+          {/* Estimated Time */}
+          <div>
+            <label className={LABEL}>Estimated Time</label>
+            <input
+              className={INPUT}
+              value={estTime}
+              onChange={(e) => setEstTime(e.target.value)}
+              placeholder="e.g. 15 min"
             />
-          )}
+          </div>
 
           {/* Category + Status */}
           <div className="grid grid-cols-2 gap-4">
@@ -389,60 +398,6 @@ export default function ContentFormModal({
 
 /* ---------------------------------------------------------- sub-fields */
 
-function VideoFields({
-  source, setSource, url, setUrl, estTime, setEstTime, existingFileName, onFileChange,
-}: {
-  source: 'embed' | 'upload';
-  setSource: (s: 'embed' | 'upload') => void;
-  url: string;
-  setUrl: (v: string) => void;
-  estTime: string;
-  setEstTime: (v: string) => void;
-  existingFileName: string | null;
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className={LABEL}>Source</label>
-        <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
-          {(['embed', 'upload'] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSource(s)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors cursor-pointer ${
-                source === s ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {s === 'embed' ? 'Embed URL' : 'Upload'}
-            </button>
-          ))}
-        </div>
-      </div>
-      {source === 'embed' ? (
-        <div>
-          <label className={LABEL}>Video URL <span className="text-red-500">*</span></label>
-          <input className={INPUT} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://youtube.com/watch?v=…" />
-        </div>
-      ) : (
-        <FileField
-          label="Video file"
-          required
-          accept={VIDEO_ACCEPT}
-          existingFileName={existingFileName}
-          onFileChange={onFileChange}
-          hint="Stored privately in this workspace."
-        />
-      )}
-      <div>
-        <label className={LABEL}>Estimated time (minutes)</label>
-        <input className={INPUT} value={estTime} onChange={(e) => setEstTime(e.target.value.replace(/[^0-9]/g, ''))} placeholder="e.g. 15" inputMode="numeric" />
-      </div>
-    </div>
-  );
-}
-
 function FileField({
   label, required, accept, existingFileName, onFileChange, hint,
 }: {
@@ -464,49 +419,6 @@ function FileField({
         <input type="file" accept={accept} onChange={onFileChange} className="hidden" />
       </label>
       {hint && <p className="mt-1 text-[11px] text-gray-400">{hint}</p>}
-    </div>
-  );
-}
-
-function RepeatableList({
-  label, addLabel, items, onAdd, onChange, onRemove, placeholder, emptyHint,
-}: {
-  label: string;
-  addLabel: string;
-  items: { id: string; value: string }[];
-  onAdd: () => void;
-  onChange: (id: string, value: string) => void;
-  onRemove: (id: string) => void;
-  placeholder: string;
-  emptyHint: string;
-}) {
-  return (
-    <div>
-      <label className={LABEL}>{label}</label>
-      <div className="space-y-2">
-        {items.length === 0 && <p className="text-[11px] text-gray-400">{emptyHint}</p>}
-        {items.map((it, i) => (
-          <div key={it.id} className="flex items-center gap-2">
-            <span className="text-xs text-gray-300 w-4 text-right">{i + 1}</span>
-            <input
-              className={INPUT}
-              value={it.value}
-              onChange={(e) => onChange(it.id, e.target.value)}
-              placeholder={placeholder}
-            />
-            <button type="button" onClick={() => onRemove(it.id)} className="text-gray-400 hover:text-red-500 cursor-pointer">
-              <Trash2 size={15} />
-            </button>
-          </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        onClick={onAdd}
-        className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700 cursor-pointer"
-      >
-        <Plus size={13} /> {addLabel}
-      </button>
     </div>
   );
 }

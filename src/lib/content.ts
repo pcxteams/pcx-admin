@@ -4,12 +4,12 @@
  * distribution model (ticket open-question #1) is deferred.
  */
 
+/** Form and Quiz are deferred to phase 2 — intentionally not in the MVP set. */
 export const CONTENT_TYPES = [
   'video',
   'resource',
   'external_link',
-  'form',
-  'quiz',
+  'leader_verification',
 ] as const;
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
@@ -35,9 +35,28 @@ export const RESOURCE_ACCEPT =
   '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp';
 export const VIDEO_ACCEPT = '.mp4,.webm,.mov,.avi';
 
+/** Mirrors the API's leader-verification type enum. */
+export const LEADER_VERIFICATION_TYPES = [
+  { value: 'live_role_play', label: 'Live Role Play' },
+  { value: 'in_person_observation', label: 'In-Person Observation' },
+  { value: 'call', label: 'Call' },
+  { value: 'video_submission_review', label: 'Video Submission Review' },
+  { value: 'file_or_document_review', label: 'File or Document Review' },
+  { value: 'form_review', label: 'Form Review' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export function verificationTypeLabel(value: string | undefined): string {
+  return LEADER_VERIFICATION_TYPES.find((t) => t.value === value)?.label ?? '—';
+}
+
+export const LEADER_ACTION_LABEL: Record<string, string> = {
+  approve: 'Approve',
+  reject: 'Reject',
+};
+
+/** Video is upload-only (never an external embed URL). */
 export interface VideoConfig {
-  source: 'embed' | 'upload';
-  url?: string;
   fileKey?: string;
   fileName?: string;
   mimeType?: string;
@@ -52,18 +71,15 @@ export interface ResourceConfig {
 export interface ExternalLinkConfig {
   url: string;
 }
-export interface FormConfig {
-  fields: Array<{ id: string; label: string; type: string; required?: boolean }>;
-}
-export interface QuizConfig {
-  questions: Array<{ id: string; prompt: string }>;
+export interface LeaderVerificationConfig {
+  verificationType: string;
+  leaderActions: string[];
 }
 export type ContentConfig =
   | VideoConfig
   | ResourceConfig
   | ExternalLinkConfig
-  | FormConfig
-  | QuizConfig
+  | LeaderVerificationConfig
   | Record<string, never>;
 
 export interface ContentAccess {
@@ -82,8 +98,7 @@ export interface ContentItemSummary {
   category: string | null;
   tags: string[];
   status: ContentStatus;
-  estTimeMinutes: number | null;
-  questionCount: number | null;
+  estTime: string | null;
   config: ContentConfig;
   usedInCount: number;
   lastEditedBy: string | null;
@@ -150,16 +165,9 @@ export const TYPE_META: Record<
     iconBg: 'bg-cyan-50',
     badge: 'bg-cyan-50 text-cyan-600',
   },
-  form: {
-    label: 'Form',
-    plural: 'Forms',
-    iconColor: 'text-green-600',
-    iconBg: 'bg-green-50',
-    badge: 'bg-green-50 text-green-600',
-  },
-  quiz: {
-    label: 'Quiz',
-    plural: 'Quizzes',
+  leader_verification: {
+    label: 'Leader Verification',
+    plural: 'Leader Verifications',
     iconColor: 'text-purple-600',
     iconBg: 'bg-purple-50',
     badge: 'bg-purple-50 text-purple-600',
@@ -172,15 +180,10 @@ export const STATUS_META: Record<ContentStatus, { label: string; cls: string }> 
   archive: { label: 'Archived', cls: 'bg-red-50 text-red-500' },
 };
 
-/** "Est. Time" column value per the design: minutes for video, count for quiz. */
+/** "Est. Time" column value (manual free text). */
 export function estTimeLabel(item: ContentItemSummary): string {
-  if (item.type === 'video' && item.estTimeMinutes != null) {
-    return `${item.estTimeMinutes} min`;
-  }
-  if (item.type === 'quiz' && item.questionCount != null) {
-    return `${item.questionCount} Question${item.questionCount === 1 ? '' : 's'}`;
-  }
-  return '—';
+  const t = item.estTime?.trim();
+  return t ? t : '—';
 }
 
 export function usedInLabel(count: number): string {
