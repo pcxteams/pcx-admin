@@ -4,7 +4,7 @@
  * distribution model (ticket open-question #1) is deferred.
  */
 
-/** Form and Quiz are deferred to phase 2 — intentionally not in the MVP set. */
+/** Form and Quiz are deferred to phase 2 and are not in the MVP set. */
 export const CONTENT_TYPES = [
   'video',
   'resource',
@@ -16,7 +16,7 @@ export type ContentType = (typeof CONTENT_TYPES)[number];
 export const CONTENT_STATUSES = ['active', 'draft', 'archive'] as const;
 export type ContentStatus = (typeof CONTENT_STATUSES)[number];
 
-/** Fixed MVP category list (open-question #2 — admin-managed later). */
+/** Fixed MVP category list (open-question #2, admin-managed later). */
 export const CONTENT_CATEGORIES = [
   'Buyer',
   'Listing',

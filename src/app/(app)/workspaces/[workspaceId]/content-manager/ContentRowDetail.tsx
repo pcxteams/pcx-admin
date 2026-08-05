@@ -82,6 +82,9 @@ export default function ContentRowDetail({
                     </span>
                   ))}
                 </div>
+                <p className="mt-1.5 text-[11px] text-gray-400">
+                  On reject, the task is reopened for the agent to retry. Nothing is blocked.
+                </p>
               </div>
             </>
           )}
@@ -249,7 +252,7 @@ function Preview({
     );
   }
 
-  // leader_verification — icon tile
+  // leader_verification: icon tile
   return (
     <div className="shrink-0">
       <div className={`w-56 h-32 rounded-lg ${meta.iconBg} flex items-center justify-center`}>

@@ -268,7 +268,7 @@ export default function ContentFormModal({
               accept={VIDEO_ACCEPT}
               existingFileName={existingFileName}
               onFileChange={onFileChange}
-              hint="Uploaded and stored privately in this workspace — never an external embed."
+              hint="Uploaded and stored privately in this workspace, never an external embed."
             />
           )}
 
@@ -287,7 +287,7 @@ export default function ContentFormModal({
               accept={RESOURCE_ACCEPT}
               existingFileName={existingFileName}
               onFileChange={onFileChange}
-              hint="Stored privately — only reachable through this workspace."
+              hint="Stored privately and only reachable through this workspace."
             />
           )}
 
@@ -312,7 +312,7 @@ export default function ContentFormModal({
                   <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-red-50 text-red-500 text-xs font-medium">Reject</span>
                 </div>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  The leader can approve or reject. The task that triggers this verification is configured in the Builder.
+                  The leader can approve or reject. On reject, the task is reopened for the agent to retry. Nothing is blocked. The task that triggers this verification is configured in the Builder.
                 </p>
               </div>
             </div>
