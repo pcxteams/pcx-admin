@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Upload, Loader2, FileText } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, TYPE_META, RESOURCE_ACCEPT, VIDEO_ACCEPT,
   LEADER_VERIFICATION_TYPES,
   type ContentType, type ContentStatus, type ContentItemDetail,
+  type ContentItemSummary, type ContentListResponse, type RelatedContentRef,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig,
   type LeaderVerificationConfig,
 } from '@/lib/content';
+import { TypeIcon } from './content-icons';
 
 const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500 MB
@@ -47,6 +49,10 @@ export default function ContentFormModal({
   const [verificationType, setVerificationType] = useState<string>(
     (item?.config as LeaderVerificationConfig)?.verificationType ??
       LEADER_VERIFICATION_TYPES[0].value,
+  );
+
+  const [relatedIds, setRelatedIds] = useState<string[]>(
+    item?.relatedContentIds ?? [],
   );
 
   const [saving, setSaving] = useState(false);
@@ -186,7 +192,7 @@ export default function ContentFormModal({
         status,
         config,
         estTime: estTime.trim() || null,
-        relatedContentIds: item?.relatedContentIds ?? [],
+        relatedContentIds: relatedIds,
       };
       if (mode === 'create') payload.type = type;
 
@@ -373,6 +379,15 @@ export default function ContentFormModal({
             </div>
           </div>
 
+          {/* Related content */}
+          <RelatedContentField
+            workspaceId={workspaceId}
+            currentItemId={item?.id}
+            value={relatedIds}
+            onChange={setRelatedIds}
+            seed={item?.relatedContent ?? []}
+          />
+
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
@@ -397,6 +412,119 @@ export default function ContentFormModal({
 }
 
 /* ---------------------------------------------------------- sub-fields */
+
+/**
+ * Typeahead picker for manually-curated related content. Loads the workspace's
+ * items once, excludes the item being edited and anything already chosen, and
+ * emits the selected ids. `seed` carries titles the caller already knows (the
+ * item's existing related refs on edit) so chips render before the list loads.
+ */
+function RelatedContentField({
+  workspaceId, currentItemId, value, onChange, seed,
+}: {
+  workspaceId: string;
+  currentItemId?: string;
+  value: string[];
+  onChange: (ids: string[]) => void;
+  seed: RelatedContentRef[];
+}) {
+  const [candidates, setCandidates] = useState<ContentItemSummary[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/workspaces/${workspaceId}/content?pageSize=100&sort=title`,
+          { credentials: 'include', signal: ctrl.signal },
+        );
+        if (res.ok) {
+          const json = (await res.json()) as ContentListResponse;
+          setCandidates(json.items);
+        }
+      } catch {
+        /* leave the picker empty on failure; the field stays usable */
+      } finally {
+        if (!ctrl.signal.aborted) setLoaded(true);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [workspaceId]);
+
+  // id -> label, drawn from both the fetched list and the edit-mode seed so a
+  // just-loaded page and a pre-existing selection both render a real title.
+  const labelById = new Map<string, { title: string; type: ContentType }>();
+  seed.forEach((r) => labelById.set(r.id, { title: r.title, type: r.type }));
+  candidates.forEach((c) => labelById.set(c.id, { title: c.title, type: c.type }));
+
+  const selected = new Set(value);
+  const q = query.trim().toLowerCase();
+  const matches = candidates
+    .filter(
+      (c) =>
+        c.id !== currentItemId &&
+        !selected.has(c.id) &&
+        (q === '' || c.title.toLowerCase().includes(q)),
+    )
+    .slice(0, 8);
+
+  return (
+    <div>
+      <label className={LABEL}>Related Content</label>
+
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {value.map((id) => {
+            const l = labelById.get(id);
+            return (
+              <span key={id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 text-xs text-gray-600">
+                {l && <TypeIcon type={l.type} iconColor={TYPE_META[l.type].iconColor} iconBg="bg-transparent" tile="w-4 h-4" size={11} />}
+                {l?.title ?? 'Untitled item'}
+                <button type="button" onClick={() => onChange(value.filter((x) => x !== id))} className="text-gray-400 hover:text-gray-600">
+                  <X size={11} />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="relative">
+        <input
+          className={INPUT}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={loaded ? 'Search content to link…' : 'Loading content…'}
+        />
+        {open && matches.length > 0 && (
+          <>
+            <button type="button" aria-hidden className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
+            <div className="absolute left-0 right-0 mt-1 z-50 max-h-52 overflow-y-auto rounded-lg border border-gray-100 bg-white p-1 shadow-xl">
+              {matches.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => { onChange([...value, c.id]); setQuery(''); setOpen(false); }}
+                  className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-50 cursor-pointer text-left"
+                >
+                  <TypeIcon type={c.type} iconColor={TYPE_META[c.type].iconColor} iconBg={TYPE_META[c.type].iconBg} tile="w-5 h-5" size={11} />
+                  <span className="truncate">{c.title}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      <p className="mt-1 text-[11px] text-gray-400">
+        Manually curated links surfaced in this item&apos;s detail panel.
+      </p>
+    </div>
+  );
+}
 
 function FileField({
   label, required, accept, existingFileName, onFileChange, hint,
