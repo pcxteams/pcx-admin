@@ -91,7 +91,7 @@ export default function ContentManagerView({
   );
 
   // refreshKey forces a reload after mutations. `load` intentionally sets
-  // loading/results state — this is a data fetch on filter/sort/page change, not
+  // loading/results state. This is a data fetch on filter/sort/page change, not
   // derived state, so the set-state-in-effect guard doesn't apply.
   useEffect(() => {
     const ctrl = new AbortController();

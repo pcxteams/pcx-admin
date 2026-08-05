@@ -34,7 +34,7 @@ export default async function ContentManagerPage({
       {!data ? (
         <div className="rounded-xl border border-gray-100 bg-white px-6 py-16 text-center">
           <p className="text-sm text-gray-500">
-            This content library couldn&apos;t be loaded — it may not exist, or you may not have
+            This content library couldn&apos;t be loaded. It may not exist, or you may not have
             access to this workspace.
           </p>
         </div>
