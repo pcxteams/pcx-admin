@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Play, Download, ExternalLink, CornerDownRight, PencilLine, Loader2,
+  Download, ExternalLink, PencilLine, Loader2,
 } from 'lucide-react';
 import {
   TYPE_META, formatDate, estTimeLabel, verificationTypeLabel, LEADER_ACTION_LABEL,
@@ -50,7 +50,7 @@ export default function ContentRowDetail({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-3">
       {/* Left: preview + details */}
       <div className="lg:col-span-2 flex gap-6">
-        <Preview detail={detail} downloading={downloading} onDownload={handleDownload} />
+        <Preview detail={detail} workspaceId={workspaceId} downloading={downloading} onDownload={handleDownload} />
 
         <div className="flex-1 min-w-0 space-y-4">
           {detail.description && (
@@ -137,37 +137,8 @@ export default function ContentRowDetail({
         </div>
       </div>
 
-      {/* Right: used in + related content */}
+      {/* Right: related content */}
       <div className="space-y-5">
-        <div>
-          <p className={LABEL}>Used In</p>
-          <div className="mt-2 space-y-3">
-            {detail.usage.length === 0 ? (
-              <p className="text-sm text-gray-400">Not referenced anywhere yet.</p>
-            ) : (
-              detail.usage.map((u, idx) => {
-                const path = u.path.length ? u.path : [`${u.referenceType}: ${u.referenceId}`];
-                return (
-                  <div key={`${u.referenceType}:${u.referenceId}:${idx}`} className="space-y-0.5">
-                    {path.map((seg, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-1 text-xs"
-                        style={{ paddingLeft: i * 14 }}
-                      >
-                        {i > 0 && <CornerDownRight size={11} className="text-gray-300 shrink-0" />}
-                        <span className={i === path.length - 1 ? 'text-teal-700 font-medium' : 'text-gray-600'}>
-                          {seg}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
         <div>
           <p className={LABEL}>Related Content</p>
           <div className="mt-2 space-y-1.5">
@@ -194,9 +165,10 @@ export default function ContentRowDetail({
 /* -------------------------------------------------------------- preview */
 
 function Preview({
-  detail, downloading, onDownload,
+  detail, workspaceId, downloading, onDownload,
 }: {
   detail: ContentItemDetail;
+  workspaceId: string;
   downloading: boolean;
   onDownload: () => void;
 }) {
@@ -204,16 +176,12 @@ function Preview({
 
   if (detail.type === 'video') {
     return (
-      <div className="shrink-0">
-        <div className="w-56 h-32 rounded-lg bg-slate-800 flex items-center justify-center">
-          <span className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center">
-            <Play size={18} className="text-slate-700 ml-0.5" />
-          </span>
-        </div>
-        <div className="mt-2">
-          <DownloadButton downloading={downloading} onDownload={onDownload} label="Download video" />
-        </div>
-      </div>
+      <VideoPreview
+        detail={detail}
+        workspaceId={workspaceId}
+        downloading={downloading}
+        onDownload={onDownload}
+      />
     );
   }
 
@@ -257,6 +225,69 @@ function Preview({
     <div className="shrink-0">
       <div className={`w-56 h-32 rounded-lg ${meta.iconBg} flex items-center justify-center`}>
         <TypeIcon type={detail.type} iconColor={meta.iconColor} iconBg="bg-transparent" size={34} tile="w-16 h-16" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inline video player. Fetches a short-lived presigned GET URL for the item's
+ * private file and streams it through a native <video> element. The presigned
+ * URL serves the object inline (no forced download disposition), so the browser
+ * can range-request and scrub it directly.
+ */
+function VideoPreview({
+  detail, workspaceId, downloading, onDownload,
+}: {
+  detail: ContentItemDetail;
+  workspaceId: string;
+  downloading: boolean;
+  onDownload: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/workspaces/${workspaceId}/content/${detail.id}/download-url`,
+          { credentials: 'include', signal: ctrl.signal },
+        );
+        if (!res.ok) {
+          setLoadError('Could not load this video.');
+          return;
+        }
+        const { url: signed } = (await res.json()) as { url: string };
+        setUrl(signed);
+      } catch {
+        if (!ctrl.signal.aborted) setLoadError('Could not load this video.');
+      }
+    })();
+    return () => ctrl.abort();
+  }, [workspaceId, detail.id]);
+
+  return (
+    <div className="shrink-0">
+      <div className="w-56 h-32 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center">
+        {url ? (
+          <video
+            src={url}
+            controls
+            preload="metadata"
+            className="w-full h-full bg-black"
+            onError={() => setLoadError('This video could not be played.')}
+          />
+        ) : loadError ? (
+          <span className="px-3 text-center text-xs text-white/70">{loadError}</span>
+        ) : (
+          <Loader2 size={18} className="text-white/70 animate-spin" />
+        )}
+      </div>
+      {loadError && url && <p className="mt-1 text-[11px] text-red-500">{loadError}</p>}
+      <div className="mt-2">
+        <DownloadButton downloading={downloading} onDownload={onDownload} label="Download video" />
       </div>
     </div>
   );

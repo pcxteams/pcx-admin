@@ -61,6 +61,8 @@ export interface VideoConfig {
   fileName?: string;
   mimeType?: string;
   fileSizeBytes?: number;
+  /** Duration in seconds, auto-detected from the file on upload. */
+  durationSeconds?: number;
 }
 export interface ResourceConfig {
   fileKey: string;
@@ -188,6 +190,24 @@ export function estTimeLabel(item: ContentItemSummary): string {
 
 export function usedInLabel(count: number): string {
   return `${count} Action${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * Human-readable video length, e.g. "4 min 32 sec" or "1 hr 3 min". Seconds are
+ * dropped once the duration reaches an hour to keep the label compact. Returns
+ * null for non-finite input so callers can fall back to manual entry.
+ */
+export function formatDuration(totalSeconds: number): string | null {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return null;
+  const s = Math.round(totalSeconds);
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  const parts: string[] = [];
+  if (hours) parts.push(`${hours} hr`);
+  if (minutes) parts.push(`${minutes} min`);
+  if (seconds && !hours) parts.push(`${seconds} sec`);
+  return parts.length ? parts.join(' ') : '0 sec';
 }
 
 /** Compact relative time for the "Last Updated" column. */
