@@ -13,6 +13,7 @@ const ROLE_BADGES: Record<string, { label: string; cls: string }> = {
 
 const STATUS_BADGES: Record<string, { label: string; dot: string; cls: string }> = {
   active: { label: 'Active', dot: 'bg-green-500', cls: 'bg-green-50 text-green-600' },
+  pending: { label: 'Pending', dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500' },
   invited: { label: 'Invited', dot: 'bg-blue-500', cls: 'bg-blue-50 text-blue-600' },
   suspended: { label: 'Suspended', dot: 'bg-orange-500', cls: 'bg-orange-50 text-orange-600' },
 };

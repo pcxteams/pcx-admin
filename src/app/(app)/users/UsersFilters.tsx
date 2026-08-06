@@ -15,6 +15,7 @@ const ROLE_OPTIONS = [
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'active', label: 'Active' },
+  { value: 'pending', label: 'Pending' },
   { value: 'invited', label: 'Invited' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'archived', label: 'Archived' },
