@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, Upload, Loader2, FileText } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, TYPE_META, RESOURCE_ACCEPT, VIDEO_ACCEPT,
-  LEADER_VERIFICATION_TYPES,
+  LEADER_VERIFICATION_TYPES, formatDuration,
   type ContentType, type ContentStatus, type ContentItemDetail,
   type ContentItemSummary, type ContentListResponse, type RelatedContentRef,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig,
@@ -18,6 +18,30 @@ const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500 MB
 const LABEL = 'block text-xs font-medium text-gray-600 mb-1.5';
 const INPUT =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent';
+
+/**
+ * Read a video file's duration (seconds) in the browser by loading just its
+ * metadata. Resolves null when the duration can't be determined — an
+ * undecodable container, a stream without a known length, or a load error.
+ */
+function readVideoDuration(f: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(f);
+    const video = document.createElement('video');
+    const done = (seconds: number | null) => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute('src');
+      resolve(seconds);
+    };
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const d = video.duration;
+      done(Number.isFinite(d) && d > 0 ? d : null);
+    };
+    video.onerror = () => done(null);
+    video.src = url;
+  });
+}
 
 export default function ContentFormModal({
   workspaceId, mode, type, item, onClose, onSaved,
@@ -44,6 +68,11 @@ export default function ContentFormModal({
   const [file, setFile] = useState<File | null>(null);
   const [existingFileName, setExistingFileName] = useState<string | null>(
     (item?.config as ResourceConfig | VideoConfig)?.fileName ?? null,
+  );
+  // Auto-detected video length (seconds). Carried into the saved config and
+  // used to auto-fill the Estimated Time field when a video is selected.
+  const [videoDuration, setVideoDuration] = useState<number | null>(
+    (item?.config as VideoConfig)?.durationSeconds ?? null,
   );
 
   const [verificationType, setVerificationType] = useState<string>(
@@ -92,6 +121,19 @@ export default function ContentFormModal({
     }
     setFile(f);
     setExistingFileName(f.name);
+
+    // Auto-detect the video length and fill in Estimated Time. Best-effort: some
+    // containers (e.g. AVI/MOV) aren't decodable by every browser, in which case
+    // we leave the field for manual entry.
+    if (type === 'video') {
+      setVideoDuration(null);
+      void readVideoDuration(f).then((seconds) => {
+        if (seconds == null) return;
+        setVideoDuration(seconds);
+        const label = formatDuration(seconds);
+        if (label) setEstTime(label);
+      });
+    }
   }
 
   async function uploadFile(f: File): Promise<{ fileKey: string; fileName: string }> {
@@ -138,6 +180,7 @@ export default function ContentFormModal({
             fileName: up.fileName,
             mimeType: file.type,
             fileSizeBytes: file.size,
+            ...(videoDuration != null ? { durationSeconds: videoDuration } : {}),
           };
         }
         // keep the existing uploaded file on edit
@@ -326,13 +369,20 @@ export default function ContentFormModal({
 
           {/* Estimated Time */}
           <div>
-            <label className={LABEL}>Estimated Time</label>
+            <label className={LABEL}>
+              {type === 'video' ? 'Length' : 'Estimated Time'}
+            </label>
             <input
               className={INPUT}
               value={estTime}
               onChange={(e) => setEstTime(e.target.value)}
-              placeholder="e.g. 15 min"
+              placeholder={type === 'video' ? 'Auto-detected from the video' : 'e.g. 15 min'}
             />
+            {type === 'video' && (
+              <p className="mt-1 text-[11px] text-gray-400">
+                Calculated automatically from the uploaded file. You can override it.
+              </p>
+            )}
           </div>
 
           {/* Category + Status */}

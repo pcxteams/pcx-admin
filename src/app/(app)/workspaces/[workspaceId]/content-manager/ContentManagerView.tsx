@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, CONTENT_TYPES, TYPE_META, STATUS_META,
-  estTimeLabel, usedInLabel, timeAgo,
+  estTimeLabel, timeAgo,
   type ContentListResponse, type ContentItemSummary, type ContentItemDetail,
   type ContentType, type ContentStatus, type ContentSort,
 } from '@/lib/content';
@@ -288,7 +288,6 @@ export default function ContentManagerView({
                 <th className={TH}>Type</th>
                 <th className={TH}>Category</th>
                 <th className={TH}>Est. Time</th>
-                <th className={TH}>Used In</th>
                 <th className={TH}>Status</th>
                 <th className={TH}>Last Updated</th>
                 <th className={`${TH} w-10`} />
@@ -297,7 +296,7 @@ export default function ContentManagerView({
             <tbody className="divide-y divide-gray-50">
               {items.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="px-4 py-16 text-center text-sm text-gray-400">
                     No content found. {canManage && 'Use “Add New” to create your first item.'}
                   </td>
                 </tr>
@@ -437,7 +436,6 @@ function RowFragment({
           )}
         </td>
         <td className={`${TD} text-gray-500`}>{estTimeLabel(item)}</td>
-        <td className={`${TD} text-gray-500 whitespace-nowrap`}>{usedInLabel(item.usedInCount)}</td>
         <td className={TD}>
           <StatusControl
             status={item.status}
@@ -462,7 +460,7 @@ function RowFragment({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={8} className="bg-gray-50/60 px-4 pb-6 pt-1">
+          <td colSpan={7} className="bg-gray-50/60 px-4 pb-6 pt-1">
             {detailLoading || !detail ? (
               <div className="flex items-center gap-2 text-sm text-gray-400 py-6">
                 <Loader2 size={14} className="animate-spin" /> Loading details…
