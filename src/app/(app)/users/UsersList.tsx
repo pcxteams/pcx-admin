@@ -12,7 +12,7 @@ export interface UsersListItem {
   workspaceId: string | null;
   workspaceName: string | null;
   role: string;
-  status: 'active' | 'invited' | 'suspended';
+  status: 'active' | 'pending' | 'invited' | 'suspended';
   phone: string | null;
   createdAt: string;
 }
