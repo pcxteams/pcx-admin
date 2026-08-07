@@ -112,10 +112,9 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [showArchived, setShowArchived] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('workspaces.showArchived') === 'true';
-  });
+  // Always defaults unchecked — product wants this to reset on every visit
+  // rather than persist across navigation.
+  const [showArchived, setShowArchived] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [submissionTarget, setSubmissionTarget] = useState<PendingWorkspace | null>(null);
   const [activateTarget, setActivateTarget] = useState<PendingWorkspace | null>(null);
@@ -353,10 +352,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
             <input
               type="checkbox"
               checked={showArchived}
-              onChange={(e) => {
-                setShowArchived(e.target.checked);
-                localStorage.setItem('workspaces.showArchived', String(e.target.checked));
-              }}
+              onChange={(e) => setShowArchived(e.target.checked)}
               className="accent-teal-600 w-3.5 h-3.5"
             />
             Show Archived

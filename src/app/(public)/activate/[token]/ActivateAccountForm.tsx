@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { CheckCircle, Eye, EyeOff } from 'lucide-react';
+
+const REDIRECT_DELAY_MS = 3000;
 
 interface Prefill {
   firstName: string;
@@ -29,6 +32,15 @@ export default function ActivateAccountForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activated, setActivated] = useState(false);
+  const router = useRouter();
+
+  // MVP behavior per KAN-92: always return to the generic Sign In page after
+  // a short delay — no auto-login. Runs once activation succeeds.
+  useEffect(() => {
+    if (!activated) return;
+    const timer = setTimeout(() => router.push('/login'), REDIRECT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [activated, router]);
 
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordMismatch = confirm.length > 0 && confirm !== password;
@@ -80,6 +92,7 @@ export default function ActivateAccountForm({
             <strong>{prefill.workspaceName}</strong> using your email and the password
             you just created.
           </p>
+          <p className="text-xs text-gray-400 mt-3">Redirecting you to Sign In…</p>
         </div>
       </div>
     );
