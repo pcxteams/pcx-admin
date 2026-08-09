@@ -41,7 +41,6 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
   const [role, setRole] = useState('all');
   const [status, setStatus] = useState('all');
   // Stub filters — held in local state only, never sent to the API.
-  const [leaderType, setLeaderType] = useState('all');
   const [careerStage, setCareerStage] = useState('all');
   const [lastActive, setLastActive] = useState('all');
 
@@ -114,8 +113,6 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
           setStatus(v);
           setPage(1);
         }}
-        leaderType={leaderType}
-        onLeaderTypeChange={setLeaderType}
         careerStage={careerStage}
         onCareerStageChange={setCareerStage}
         lastActive={lastActive}
