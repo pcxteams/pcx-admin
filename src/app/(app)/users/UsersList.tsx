@@ -17,6 +17,7 @@ export interface UsersListItem {
   phone: string | null;
   createdAt: string;
   isPrimaryContact: boolean;
+  leaderName: string | null;
 }
 
 export interface UsersListResponse {

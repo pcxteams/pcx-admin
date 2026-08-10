@@ -100,11 +100,11 @@ function RowActionsMenu({ user, onDeleteClick }: { user: UsersListItem; onDelete
 }
 
 /**
- * Leader / Career Stage / Pending Actions / Last Active have no backing data
- * model yet (no agent-leader assignment table, no career-stage or
- * activity-tracking columns) — rendered as static "—" placeholders rather
- * than fabricated values. See implementation plan for the confirmed
- * decision.
+ * Leader shows the agent's primary leader (via agent_leader_assignment) —
+ * always "—" for non-agents, who have no "leader of a leader" concept.
+ * Career Stage / Pending Actions / Last Active still have no backing data
+ * model (no career-stage or activity-tracking columns) — rendered as static
+ * "—" placeholders rather than fabricated values.
  */
 interface UsersTableProps {
   items: UsersListItem[];
@@ -171,9 +171,7 @@ export default function UsersTable({ items, onDeleteClick }: UsersTableProps) {
                     {role.label}
                   </span>
                 </td>
-                <td className={TD}>
-                  <span className="text-gray-400">—</span>
-                </td>
+                <td className={TD}>{u.leaderName ?? <span className="text-gray-400">—</span>}</td>
                 <td className={TD}>
                   <span className="text-gray-400">—</span>
                 </td>
