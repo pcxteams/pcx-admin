@@ -1,12 +1,13 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import type { UsersListItem } from './UsersList';
 
 const ROLE_BADGES: Record<string, { label: string; cls: string }> = {
   agent: { label: 'Agent', cls: 'bg-blue-50 text-blue-700' },
   leader: { label: 'Leader', cls: 'bg-emerald-50 text-emerald-700' },
-  manager: { label: 'Workspace Manager', cls: 'bg-purple-50 text-purple-700' },
+  manager: { label: 'Manager', cls: 'bg-purple-50 text-purple-700' },
   admin: { label: 'PCx Admin', cls: 'bg-amber-50 text-amber-700' },
   master: { label: 'PCx Master Admin', cls: 'bg-red-50 text-red-700' },
 };
@@ -46,13 +47,71 @@ const TH =
 const TD = 'px-4 py-3.5 text-sm text-gray-700 align-middle';
 
 /**
+ * A primary contact's membership disappearing along with the user would
+ * strand the workspace without one (its billing_record and
+ * workspace_setup_token are keyed to workspace_id, not user_id, so they'd
+ * survive orphaned) — Delete is disabled rather than offered for that case.
+ */
+function RowActionsMenu({ user, onDeleteClick }: { user: UsersListItem; onDeleteClick: (user: UsersListItem) => void }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-gray-400 hover:text-gray-600 cursor-pointer"
+        aria-label={`Actions for ${user.name}`}
+      >
+        <MoreHorizontal size={16} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-50 mt-1 min-w-[140px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (user.isPrimaryContact) return;
+              setOpen(false);
+              onDeleteClick(user);
+            }}
+            disabled={user.isPrimaryContact}
+            title={user.isPrimaryContact ? "Workspace primary contacts can't be deleted" : undefined}
+            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Leader / Career Stage / Pending Actions / Last Active have no backing data
  * model yet (no agent-leader assignment table, no career-stage or
  * activity-tracking columns) — rendered as static "—" placeholders rather
  * than fabricated values. See implementation plan for the confirmed
  * decision.
  */
-export default function UsersTable({ items }: { items: UsersListItem[] }) {
+interface UsersTableProps {
+  items: UsersListItem[];
+  onDeleteClick: (user: UsersListItem) => void;
+}
+
+export default function UsersTable({ items, onDeleteClick }: UsersTableProps) {
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 px-6 py-10 text-center text-sm text-gray-400">
@@ -131,9 +190,7 @@ export default function UsersTable({ items }: { items: UsersListItem[] }) {
                   </span>
                 </td>
                 <td className={TD}>
-                  <button type="button" className="text-gray-400 hover:text-gray-600">
-                    <MoreHorizontal size={16} />
-                  </button>
+                  <RowActionsMenu user={u} onDeleteClick={onDeleteClick} />
                 </td>
               </tr>
             );

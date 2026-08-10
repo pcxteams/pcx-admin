@@ -8,7 +8,7 @@ const ROLE_OPTIONS = [
   { value: 'all', label: 'All Roles' },
   { value: 'agent', label: 'Agent' },
   { value: 'leader', label: 'Leader' },
-  { value: 'manager', label: 'Workspace Manager' },
+  { value: 'manager', label: 'Manager' },
   { value: 'admin', label: 'PCx Admin' },
 ];
 
