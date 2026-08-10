@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
 import UsersFilters from './UsersFilters';
 import UsersTable from './UsersTable';
+import { deleteUser } from '@/lib/users';
 
 export interface UsersListItem {
   id: string;
@@ -15,6 +16,7 @@ export interface UsersListItem {
   status: 'active' | 'pending' | 'invited' | 'suspended';
   phone: string | null;
   createdAt: string;
+  isPrimaryContact: boolean;
 }
 
 export interface UsersListResponse {
@@ -41,7 +43,6 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
   const [role, setRole] = useState('all');
   const [status, setStatus] = useState('all');
   // Stub filters — held in local state only, never sent to the API.
-  const [leaderType, setLeaderType] = useState('all');
   const [careerStage, setCareerStage] = useState('all');
   const [lastActive, setLastActive] = useState('all');
 
@@ -49,6 +50,10 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
   const [perPage, setPerPage] = useState(initialData.perPage);
   const [data, setData] = useState(initialData);
   const [loading, setLoading] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<UsersListItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstRender = useRef(true);
@@ -72,6 +77,20 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
       setLoading(false);
     }
   }, [search, workspaceId, role, status, page, perPage]);
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    const result = await deleteUser(deleteTarget.id);
+    setIsDeleting(false);
+    if (!result.ok) {
+      setDeleteError(result.message);
+      return;
+    }
+    setDeleteTarget(null);
+    await fetchUsers();
+  }
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -114,8 +133,6 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
           setStatus(v);
           setPage(1);
         }}
-        leaderType={leaderType}
-        onLeaderTypeChange={setLeaderType}
         careerStage={careerStage}
         onCareerStageChange={setCareerStage}
         lastActive={lastActive}
@@ -123,7 +140,7 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
       />
 
       <div className={`mt-4 transition-opacity ${loading ? 'opacity-60' : ''}`}>
-        <UsersTable items={data.items} />
+        <UsersTable items={data.items} onDeleteClick={(u) => { setDeleteTarget(u); setDeleteError(null); }} />
       </div>
 
       <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
@@ -179,6 +196,59 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
           </select>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="px-6 pt-6 pb-5">
+              <div className="flex items-start gap-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 shrink-0">
+                  <AlertTriangle size={18} className="text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900">Delete user?</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">This action is permanent and cannot be undone.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                  disabled={isDeleting}
+                  className="text-gray-400 hover:text-gray-600 transition-colors shrink-0 disabled:opacity-40"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3.5">
+                <p className="text-sm font-medium text-gray-900">{deleteTarget.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{deleteTarget.email}</p>
+              </div>
+
+              {deleteError && <p className="mt-3 text-sm text-red-600">{deleteError}</p>}
+            </div>
+
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
