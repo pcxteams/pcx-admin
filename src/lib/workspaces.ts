@@ -1,14 +1,18 @@
 import type { AsyncOption } from '@/components/AsyncSearchableSelect';
 
+export interface WorkspaceOption extends AsyncOption {
+  type: 'office' | 'team';
+}
+
 /** Typeahead search across office + team workspaces, scoped server-side to the caller. */
-export async function fetchWorkspaceOptions(query: string, limit = 20): Promise<AsyncOption[]> {
+export async function fetchWorkspaceOptions(query: string, limit = 20): Promise<WorkspaceOption[]> {
   try {
     const res = await fetch(`/api/workspaces/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
       credentials: 'include',
     });
     if (!res.ok) return [];
-    const data = (await res.json()) as { id: string; name: string; type: string }[];
-    return data.map((w) => ({ id: w.id, label: w.name }));
+    const data = (await res.json()) as { id: string; name: string; type: 'office' | 'team' }[];
+    return data.map((w) => ({ id: w.id, label: w.name, type: w.type }));
   } catch {
     return [];
   }
