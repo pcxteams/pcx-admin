@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, X } from 'lucide-react';
-import AsyncSearchableSelect, { type AsyncOption } from '@/components/AsyncSearchableSelect';
-import { fetchWorkspaceOptions, fetchTeamOptions, fetchMyWorkspaceScope, type MyWorkspaceScope } from '@/lib/workspaces';
+import AsyncSearchableSelect from '@/components/AsyncSearchableSelect';
+import {
+  fetchWorkspaceOptions,
+  fetchTeamOptions,
+  fetchMyWorkspaceScope,
+  type MyWorkspaceScope,
+  type WorkspaceOption,
+} from '@/lib/workspaces';
 import { createInvitedUser, type CreateUserRole, type ProductionLevelInput } from '@/lib/users';
 import ProfilePhotoUpload from './ProfilePhotoUpload';
 import AssignedLeaderFields, { type LeaderValue } from './AssignedLeaderFields';
@@ -55,6 +61,14 @@ export default function AddUserForm() {
   const [myScope, setMyScope] = useState<MyWorkspaceScope | null>(null);
   const [primaryWorkspaceId, setPrimaryWorkspaceId] = useState('');
   const [primaryWorkspaceLabel, setPrimaryWorkspaceLabel] = useState('');
+  // A Team can never itself be the parent of another Team (hierarchy is
+  // Office -> Team, one level, per the Foundational Architecture doc) — the
+  // Team field only ever makes sense when the Primary Workspace is an
+  // Office. Populated via workspaceTypeCache below, since neither
+  // AsyncSearchableSelect's onChange nor the myScope options carry type
+  // through to this handler directly.
+  const [primaryWorkspaceType, setPrimaryWorkspaceType] = useState<'office' | 'team' | null>(null);
+  const workspaceTypeCache = useRef<Map<string, 'office' | 'team'>>(new Map());
   const [teamId, setTeamId] = useState('');
   const [teamLabel, setTeamLabel] = useState('');
   const [additionalWorkspaces, setAdditionalWorkspaces] = useState<LeaderValue[]>([]);
@@ -78,6 +92,7 @@ export default function AddUserForm() {
       if (scope.mode === 'workspaces' && scope.workspaces.length === 1) {
         setPrimaryWorkspaceId(scope.workspaces[0].id);
         setPrimaryWorkspaceLabel(scope.workspaces[0].name);
+        setPrimaryWorkspaceType(scope.workspaces[0].type);
       }
     });
   }, []);
@@ -105,6 +120,11 @@ export default function AddUserForm() {
     };
   }, [role, primaryWorkspaceId]);
 
+  function cacheWorkspaceTypes(options: WorkspaceOption[]): WorkspaceOption[] {
+    options.forEach((o) => workspaceTypeCache.current.set(o.id, o.type));
+    return options;
+  }
+
   function fetchWorkspaceOptionsExcluding(excludeIds: string[]) {
     return async (query: string) => {
       const options = await fetchWorkspaceOptions(query);
@@ -117,16 +137,24 @@ export default function AddUserForm() {
   const singleAutofilledWorkspace =
     myScope?.mode === 'workspaces' && myScope.workspaces.length === 1 ? myScope.workspaces[0] : null;
 
-  async function fetchMyScopeOptions(query: string): Promise<AsyncOption[]> {
+  async function fetchMyScopeOptions(query: string): Promise<WorkspaceOption[]> {
     if (!myScope || myScope.mode !== 'workspaces') return [];
-    return myScope.workspaces
-      .filter((w) => w.name.toLowerCase().includes(query.toLowerCase()))
-      .map((w) => ({ id: w.id, label: w.name }));
+    return cacheWorkspaceTypes(
+      myScope.workspaces
+        .filter((w) => w.name.toLowerCase().includes(query.toLowerCase()))
+        .map((w) => ({ id: w.id, label: w.name, type: w.type })),
+    );
+  }
+
+  async function fetchPrimaryWorkspaceOptions(query: string): Promise<WorkspaceOption[]> {
+    const options = myScope?.mode === 'all' ? await fetchWorkspaceOptions(query) : await fetchMyScopeOptions(query);
+    return cacheWorkspaceTypes(options);
   }
 
   function handlePrimaryWorkspaceChange(id: string, label: string) {
     setPrimaryWorkspaceId(id);
     setPrimaryWorkspaceLabel(label);
+    setPrimaryWorkspaceType(id ? workspaceTypeCache.current.get(id) ?? null : null);
     setTeamId('');
     setTeamLabel('');
     setPrimaryLeader(EMPTY_LEADER);
@@ -276,7 +304,7 @@ export default function AddUserForm() {
                 value={primaryWorkspaceId}
                 selectedLabel={primaryWorkspaceLabel}
                 onChange={handlePrimaryWorkspaceChange}
-                fetchOptions={myScope?.mode === 'all' ? fetchWorkspaceOptions : fetchMyScopeOptions}
+                fetchOptions={fetchPrimaryWorkspaceOptions}
                 placeholder="Select workspace"
               />
             </div>
@@ -287,7 +315,7 @@ export default function AddUserForm() {
             </p>
           )}
 
-          {role === 'agent' && (
+          {role === 'agent' && primaryWorkspaceType !== 'team' && (
             <div>
               <label className={LABEL_CLASS}>Team</label>
               <AsyncSearchableSelect
