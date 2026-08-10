@@ -49,12 +49,19 @@ export default function AssignedLeaderFields({
   // reset via a synchronous setState branch in the effect.
   const [fetchedSingleLeader, setFetchedSingleLeader] = useState<LeaderValue | null>(null);
   const lockedSingleLeader = workspaceId ? fetchedSingleLeader : null;
+  // Total eligible leader pool size for this workspace (independent of how
+  // many are already selected) — used to disable "Add Another Leader" once
+  // every eligible leader has already been picked as primary/additional.
+  // Defaults to true while unresolved so the button doesn't flash disabled.
+  const [eligibleCount, setEligibleCount] = useState<number | null>(null);
+  const hasOtherLeaders = eligibleCount === null ? true : eligibleCount > additionalLeaders.length + 1;
 
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
     fetchLeaderOptions(workspaceId, '').then((options) => {
       if (cancelled) return;
+      setEligibleCount(options.length);
       if (options.length === 1) {
         setFetchedSingleLeader(options[0]);
         onPrimaryLeaderChange({ id: options[0].id, label: options[0].label });
@@ -139,12 +146,15 @@ export default function AssignedLeaderFields({
         <button
           type="button"
           onClick={addLeader}
-          disabled={disabled}
+          disabled={disabled || !hasOtherLeaders}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-gray-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={14} />
           Add Another Leader
         </button>
+        {!disabled && !hasOtherLeaders && (
+          <p className="mt-1 text-xs text-gray-400">No other eligible leaders available</p>
+        )}
       </div>
     </div>
   );
