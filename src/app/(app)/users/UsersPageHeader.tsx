@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Download, Columns3, Plus } from 'lucide-react';
 
 /**
@@ -26,13 +27,13 @@ export default function UsersPageHeader() {
           <Columns3 size={14} />
           Customize Columns
         </button>
-        <button
-          type="button"
+        <Link
+          href="/users/add"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors cursor-pointer"
         >
           <Plus size={14} />
           Add User
-        </button>
+        </Link>
         <button
           type="button"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-gray-300 transition-colors cursor-pointer"
