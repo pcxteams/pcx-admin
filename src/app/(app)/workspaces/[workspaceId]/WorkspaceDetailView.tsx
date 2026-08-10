@@ -8,6 +8,8 @@ import {
   Save, Pencil, Trash2, Plus, Check, Search,
 } from 'lucide-react';
 import type { WorkspaceDetail } from './page';
+import LeadershipTeamEditor from '@/components/LeadershipTeamEditor';
+import CustomizationsSection from '@/components/CustomizationsSection';
 
 const BRAND = '#009689';
 
@@ -284,9 +286,9 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
       {/* ── Scrollable content ── */}
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
 
-        {/* Workspace Information */}
+        {/* Workspace Details */}
         <div className={SECTION}>
-          <p className={SECTION_TITLE}>Workspace Information</p>
+          <p className={SECTION_TITLE}>Workspace Details</p>
           <p className={SECTION_SUB}>Core workspace details and configuration.</p>
           <div className="grid grid-cols-3 gap-x-12 gap-y-6">
             <div className={FIELD}>
@@ -320,6 +322,12 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
             <div className={FIELD}>
               <label className={LABEL}>Website</label>
               <input className={`${INPUT} ${INPUT_FOCUS}`} value={form.website} onChange={set('website')} placeholder="https://example.com" />
+            </div>
+            <div className={FIELD}>
+              <p className={LABEL}>Maximum Users</p>
+              <p className="text-sm text-gray-900">
+                {data.billing.seatLimit ?? <span className="text-gray-400">—</span>}
+              </p>
             </div>
           </div>
         </div>
@@ -407,50 +415,8 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
           )}
         </div>
 
-        {/* Workspace Leaders — read-only */}
-        <div className={SECTION}>
-          <p className={SECTION_TITLE}>Workspace Leaders</p>
-          <p className={SECTION_SUB}>Leaders currently assigned to this Workspace.</p>
-          {data.leaders.length === 0 ? (
-            <p className="text-sm text-gray-400">No leaders assigned.</p>
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-100">
-              <table className="w-full text-sm">
-                <thead className="border-b border-gray-100">
-                  <tr>
-                    {['Name', 'Role', 'Email', 'Phone', 'Job Title', 'Status'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {data.leaders.map((l) => (
-                    <tr key={l.userId} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-semibold shrink-0" style={{ backgroundColor: BRAND }}>
-                            {initials(l.name)}
-                          </div>
-                          <span className="font-medium text-gray-900">{l.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 capitalize">{l.role}</td>
-                      <td className="px-4 py-3 text-gray-600">{l.email}</td>
-                      <td className="px-4 py-3 text-gray-600">{l.phone ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{l.jobTitle ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${l.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                          {l.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {/* Leadership Team — editable (master can always manage) */}
+        <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leaders} canManage />
 
         {/* Workspace Teams — placeholder */}
         <div className={SECTION}>
@@ -660,6 +626,12 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
             </div>
           </div>
         </div>
+
+        {/* Customizations — setup progress */}
+        <CustomizationsSection
+          setupCompleted={data.setupCompleted}
+          customizationCompleted={data.customizationCompleted}
+        />
 
         {/* PCx Master Only */}
         <div className="rounded-xl border border-red-200 bg-red-50/40 p-6">
