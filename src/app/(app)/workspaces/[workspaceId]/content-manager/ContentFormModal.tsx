@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, Upload, Loader2, FileText } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, TYPE_META, RESOURCE_ACCEPT, VIDEO_ACCEPT,
-  LEADER_VERIFICATION_TYPES, formatDuration,
+  LEADER_VERIFICATION_TYPES, formatDuration, parseVideoEmbedUrl,
   type ContentType, type ContentStatus, type ContentItemDetail,
   type ContentItemSummary, type ContentListResponse, type RelatedContentRef,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig,
@@ -74,6 +74,10 @@ export default function ContentFormModal({
   const [videoDuration, setVideoDuration] = useState<number | null>(
     (item?.config as VideoConfig)?.durationSeconds ?? null,
   );
+  const [videoSource, setVideoSource] = useState<'upload' | 'embed'>(
+    (item?.config as VideoConfig)?.source === 'embed' ? 'embed' : 'upload',
+  );
+  const [videoUrl, setVideoUrl] = useState((item?.config as VideoConfig)?.url ?? '');
 
   const [verificationType, setVerificationType] = useState<string>(
     (item?.config as LeaderVerificationConfig)?.verificationType ??
@@ -173,9 +177,16 @@ export default function ContentFormModal({
       case 'external_link':
         return { url: linkUrl.trim() };
       case 'video':
+        if (videoSource === 'embed') {
+          const url = videoUrl.trim();
+          const parsed = parseVideoEmbedUrl(url);
+          if (!parsed) throw new Error('Add a YouTube or Vimeo video link.');
+          return { source: 'embed', url, ...parsed };
+        }
         if (file) {
           const up = await uploadFile(file);
           return {
+            source: 'upload',
             fileKey: up.fileKey,
             fileName: up.fileName,
             mimeType: file.type,
@@ -184,7 +195,7 @@ export default function ContentFormModal({
           };
         }
         // keep the existing uploaded file on edit
-        return { ...(item?.config as VideoConfig) };
+        return { ...(item?.config as VideoConfig), source: 'upload' };
       case 'resource':
         if (file) {
           const up = await uploadFile(file);
@@ -208,8 +219,14 @@ export default function ContentFormModal({
       if (!/^https?:\/\//i.test(linkUrl.trim()))
         return 'The URL must start with http:// or https://.';
     }
-    if (type === 'video' && !file && !existingFileName)
-      return 'Please choose a video file to upload.';
+    if (type === 'video') {
+      if (videoSource === 'embed') {
+        if (!parseVideoEmbedUrl(videoUrl.trim()))
+          return 'Add a YouTube or Vimeo video link.';
+      } else if (!file && !existingFileName) {
+        return 'Please choose a video file to upload.';
+      }
+    }
     if (type === 'resource' && !file && !existingFileName)
       return 'Please choose a file to upload.';
     if (type === 'leader_verification' && !verificationType)
@@ -311,14 +328,48 @@ export default function ContentFormModal({
 
           {/* Type-specific */}
           {type === 'video' && (
-            <FileField
-              label="Video file"
-              required
-              accept={VIDEO_ACCEPT}
-              existingFileName={existingFileName}
-              onFileChange={onFileChange}
-              hint="Uploaded and stored privately in this workspace, never an external embed."
-            />
+            <div className="space-y-3">
+              <div>
+                <label className={LABEL}>Source</label>
+                <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
+                  {(['upload', 'embed'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setVideoSource(s)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                        videoSource === s ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {s === 'upload' ? 'Upload file' : 'Video link'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {videoSource === 'embed' ? (
+                <div>
+                  <label className={LABEL}>Video URL <span className="text-red-500">*</span></label>
+                  <input
+                    className={INPUT}
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=… or https://vimeo.com/…"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Add a YouTube or Vimeo video link. It plays inside PCx — viewers are never sent to the external site.
+                  </p>
+                </div>
+              ) : (
+                <FileField
+                  label="Video file"
+                  required
+                  accept={VIDEO_ACCEPT}
+                  existingFileName={existingFileName}
+                  onFileChange={onFileChange}
+                  hint="Uploaded and stored privately in this workspace."
+                />
+              )}
+            </div>
           )}
 
           {type === 'external_link' && (
@@ -376,9 +427,13 @@ export default function ContentFormModal({
               className={INPUT}
               value={estTime}
               onChange={(e) => setEstTime(e.target.value)}
-              placeholder={type === 'video' ? 'Auto-detected from the video' : 'e.g. 15 min'}
+              placeholder={
+                type === 'video' && videoSource === 'upload'
+                  ? 'Auto-detected from the video'
+                  : 'e.g. 15 min'
+              }
             />
-            {type === 'video' && (
+            {type === 'video' && videoSource === 'upload' && (
               <p className="mt-1 text-[11px] text-gray-400">
                 Calculated automatically from the uploaded file. You can override it.
               </p>
