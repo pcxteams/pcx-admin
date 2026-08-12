@@ -90,7 +90,11 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-3 sidebar-scroll">
         {navigation
-          .filter((group) => !group.requiredRole || group.requiredRole === user?.role)
+          .filter(
+            (group) =>
+              !group.requiredRoles ||
+              (!!user?.role && group.requiredRoles.includes(user.role)),
+          )
           .map((group) => (
             <div key={group.section}>
               <div className="px-5 mb-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">

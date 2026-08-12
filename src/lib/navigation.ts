@@ -7,7 +7,8 @@ export type NavItem = {
 export type NavSection = {
   section: string;
   items: NavItem[];
-  requiredRole?: string;
+  /** Show only to these platform roles (any match); omit to show to everyone. */
+  requiredRoles?: string[];
 };
 
 export const navigation: NavSection[] = [
@@ -16,6 +17,13 @@ export const navigation: NavSection[] = [
     items: [
       { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid' },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
+    ],
+  },
+  {
+    section: 'WORKSPACE',
+    requiredRoles: ['manager', 'leader'],
+    items: [
+      { label: 'Workspace Profile', href: '/workspace-profile', icon: 'Building2' },
     ],
   },
   {
@@ -60,7 +68,7 @@ export const navigation: NavSection[] = [
   },
   {
     section: 'SETTINGS',
-    requiredRole: 'master',
+    requiredRoles: ['master'],
     items: [
       { label: 'Workspace Settings', href: '/settings/workspace', icon: 'Settings2' },
       { label: 'Leader Resources', href: '/settings/leader-resources', icon: 'BookMarked' },
