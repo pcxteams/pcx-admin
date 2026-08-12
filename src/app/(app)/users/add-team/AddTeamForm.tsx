@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Crown } from 'lucide-react';
 import AsyncSearchableSelect from '@/components/AsyncSearchableSelect';
 import {
   fetchOfficeOptions,
@@ -121,7 +121,14 @@ export default function AddTeamForm() {
         <p className="text-sm text-amber-800">
           This creates a <strong>free team with limited functionality</strong>. Free teams inherit
           their office content and cannot manage an independent subscription or content library.
-          Need a paid team? Contact PCx support to get set up.
+          Need a paid team?{' '}
+          <a
+            href="mailto:support@pcxteams.com"
+            className="font-medium underline hover:text-amber-900"
+          >
+            Contact PCx support
+          </a>{' '}
+          to get set up.
         </p>
       </div>
 
@@ -176,6 +183,20 @@ export default function AddTeamForm() {
             <div className={CARD_HEADER_CLASS}>2. Team Leader</div>
             <div className={CARD_BODY_CLASS}>
               <p className="text-xs text-gray-400 -mt-1">Every team must have one Team Leader.</p>
+
+              <div
+                className={
+                  teamLeader.id
+                    ? 'flex items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3'
+                    : 'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-4 py-5 text-center'
+                }
+              >
+                <Crown size={18} className={teamLeader.id ? 'text-teal-600' : 'text-gray-300'} />
+                <p className={teamLeader.id ? 'text-sm font-medium text-gray-900' : 'text-sm text-gray-400'}>
+                  {teamLeader.id ? teamLeader.label : 'No team leader selected'}
+                </p>
+              </div>
+
               <div>
                 <label className={LABEL_CLASS}>
                   Search Active Leaders <span className="text-red-500">*</span>
@@ -188,9 +209,6 @@ export default function AddTeamForm() {
                   placeholder={officeWorkspaceId ? 'Select leader' : 'Select an office first'}
                   disabled={!officeWorkspaceId}
                 />
-                <p className="mt-1 text-xs text-gray-400">
-                  Choose from the Active Managers and Leaders associated with this Office Workspace.
-                </p>
               </div>
             </div>
           </div>
