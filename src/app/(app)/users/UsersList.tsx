@@ -37,10 +37,23 @@ function pageWindow(current: number, totalPages: number, size = 7): number[] {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }
 
-export default function UsersList({ initialData }: { initialData: UsersListResponse }) {
+interface UsersListProps {
+  initialData: UsersListResponse;
+  // Lifted to the parent (UsersPageClient) rather than owned here, so the
+  // Users page header's "Add Team" link can default to whichever workspace
+  // this filter currently has selected (KAN-97, Master/PCx Admin case).
+  workspaceId: string;
+  workspaceLabel: string;
+  onWorkspaceChange: (id: string, label: string) => void;
+}
+
+export default function UsersList({
+  initialData,
+  workspaceId,
+  workspaceLabel,
+  onWorkspaceChange,
+}: UsersListProps) {
   const [search, setSearch] = useState('');
-  const [workspaceId, setWorkspaceId] = useState('');
-  const [workspaceLabel, setWorkspaceLabel] = useState('');
   const [role, setRole] = useState('all');
   const [status, setStatus] = useState('all');
   // Stub filters — held in local state only, never sent to the API.
@@ -120,8 +133,7 @@ export default function UsersList({ initialData }: { initialData: UsersListRespo
         workspaceId={workspaceId}
         workspaceLabel={workspaceLabel}
         onWorkspaceChange={(id, label) => {
-          setWorkspaceId(id);
-          setWorkspaceLabel(label);
+          onWorkspaceChange(id, label);
           setPage(1);
         }}
         role={role}
