@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 import UsersPageHeader from './UsersPageHeader';
-import StatsCards, { type UsersStats } from './StatsCards';
-import UsersList, { type UsersListResponse } from './UsersList';
+import { type UsersStats } from './StatsCards';
+import { type UsersListResponse } from './UsersList';
+import UsersPageClient from './UsersPageClient';
 
 export default async function UsersPage() {
   const session = await getSession();
@@ -24,16 +25,15 @@ export default async function UsersPage() {
 
   return (
     <div className="p-8">
-      <UsersPageHeader />
       {hasAccess ? (
-        <>
-          <StatsCards stats={stats} />
-          <UsersList initialData={initialList} />
-        </>
+        <UsersPageClient stats={stats} initialList={initialList} />
       ) : (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-gray-400 text-sm">You don&apos;t have access to the Users directory.</p>
-        </div>
+        <>
+          <UsersPageHeader />
+          <div className="flex items-center justify-center h-64">
+            <p className="text-gray-400 text-sm">You don&apos;t have access to the Users directory.</p>
+          </div>
+        </>
       )}
     </div>
   );
