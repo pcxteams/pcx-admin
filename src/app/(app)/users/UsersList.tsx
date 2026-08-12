@@ -96,7 +96,7 @@ export default function UsersList({
     if (!deleteTarget) return;
     setIsDeleting(true);
     setDeleteError(null);
-    const result = await deleteUser(deleteTarget.id);
+    const result = await deleteUser(deleteTarget.id, deleteTarget.workspaceId ?? undefined);
     setIsDeleting(false);
     if (!result.ok) {
       setDeleteError(result.message);
@@ -220,8 +220,14 @@ export default function UsersList({
                   <AlertTriangle size={18} className="text-red-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-base font-semibold text-gray-900">Delete user?</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">This action is permanent and cannot be undone.</p>
+                  <h2 className="text-base font-semibold text-gray-900">
+                    {deleteTarget.workspaceId ? 'Remove from workspace?' : 'Delete user?'}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {deleteTarget.workspaceId
+                      ? `This removes ${deleteTarget.name} from ${deleteTarget.workspaceName ?? 'this workspace'}. If it's their only workspace, their account is deleted entirely.`
+                      : 'This action is permanent and cannot be undone.'}
+                  </p>
                 </div>
                 <button
                   type="button"

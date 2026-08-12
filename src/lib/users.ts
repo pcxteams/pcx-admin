@@ -88,9 +88,21 @@ export async function createInvitedUser(
   }
 }
 
-export async function deleteUser(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+/**
+ * Removes the membership tying this person to `workspaceId` — someone with
+ * memberships in more than one workspace keeps the rest and their account.
+ * `workspaceId` is omitted only for a platform admin/master with no
+ * membership row at all, in which case the whole account is deleted.
+ */
+export async function deleteUser(
+  id: string,
+  workspaceId?: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE', credentials: 'include' });
+    const url = workspaceId
+      ? `/api/users/${id}?workspaceId=${encodeURIComponent(workspaceId)}`
+      : `/api/users/${id}`;
+    const res = await fetch(url, { method: 'DELETE', credentials: 'include' });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { message?: string };
       return { ok: false, message: body.message ?? 'Something went wrong. Please try again.' };
