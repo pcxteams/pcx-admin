@@ -27,6 +27,8 @@ export interface WorkspaceDetail {
   } | null;
   createdAt: string;
   updatedAt: string;
+  setupCompleted: boolean;
+  customizationCompleted: boolean;
   reportsTo: { id: string; name: string; type: 'office' | 'team' } | null;
   primaryContact: { name: string; email: string };
   billing: {
@@ -36,12 +38,16 @@ export interface WorkspaceDetail {
     billingStatus: string | null;
   };
   leaders: {
+    membershipId: string;
     userId: string;
     name: string;
     email: string;
-    role: string;
+    role: 'manager' | 'leader';
     phone: string | null;
     jobTitle: string | null;
+    canEditSettings: boolean;
+    visibilityScope: 'workspace' | 'assigned_agents';
+    showProfile: boolean;
     isActive: boolean;
     lastActive: string;
   }[];
