@@ -1,11 +1,17 @@
 import Link from 'next/link';
 import { Download, Columns3, Plus } from 'lucide-react';
 
+interface Props {
+  /** KAN-97 Add Team destination — defaults to plain /users/add-team when absent. */
+  addTeamHref?: string;
+}
+
 /**
- * Toolbar buttons are intentionally inert for now — no onClick handler —
- * per product direction: the UI should exist ahead of the actions behind it.
+ * Export / Customize Columns are still intentionally inert — no onClick
+ * handler — per product direction: the UI should exist ahead of the actions
+ * behind it. Add User / Add Team are both real now.
  */
-export default function UsersPageHeader() {
+export default function UsersPageHeader({ addTeamHref = '/users/add-team' }: Props) {
   return (
     <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
       <div>
@@ -34,13 +40,13 @@ export default function UsersPageHeader() {
           <Plus size={14} />
           Add User
         </Link>
-        <button
-          type="button"
+        <Link
+          href={addTeamHref}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-gray-300 transition-colors cursor-pointer"
         >
           <Plus size={14} />
           Add Team
-        </button>
+        </Link>
       </div>
     </div>
   );

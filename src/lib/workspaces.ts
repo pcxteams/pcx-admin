@@ -45,6 +45,23 @@ export async function fetchTeamOptions(
   }
 }
 
+/**
+ * Active Office workspaces — KAN-97's Add Team "Parent Office" resolution
+ * for a Master/PCx Admin caller (a scoped Manager/Leader never needs this;
+ * their own Office is resolved from my-scope instead).
+ */
+export async function fetchOfficeOptions(query: string, limit = 20): Promise<AsyncOption[]> {
+  try {
+    const params = new URLSearchParams({ q: query, limit: String(limit), type: 'office' });
+    const res = await fetch(`/api/workspaces/search?${params.toString()}`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { id: string; name: string; type: string }[];
+    return data.map((w) => ({ id: w.id, label: w.name }));
+  } catch {
+    return [];
+  }
+}
+
 export type MyWorkspaceScope =
   | { mode: 'all' }
   | { mode: 'workspaces'; workspaces: { id: string; name: string; type: 'office' | 'team' }[] }
@@ -63,5 +80,33 @@ export async function fetchMyWorkspaceScope(): Promise<MyWorkspaceScope> {
     return (await res.json()) as MyWorkspaceScope;
   } catch {
     return { mode: 'none' };
+  }
+}
+
+export interface CreateFreeTeamPayload {
+  teamName: string;
+  teamLeaderId: string;
+  officeWorkspaceId: string;
+}
+
+/** KAN-97: self-service Free Team creation from the Users page. */
+export async function createFreeTeam(
+  payload: CreateFreeTeamPayload,
+): Promise<{ ok: true; workspaceId: string } | { ok: false; message: string }> {
+  try {
+    const res = await fetch('/api/workspaces/free-team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
+      return { ok: false, message: body.message ?? 'Something went wrong. Please try again.' };
+    }
+    const data = (await res.json()) as { workspaceId: string };
+    return { ok: true, workspaceId: data.workspaceId };
+  } catch {
+    return { ok: false, message: 'Network error. Please check your connection and try again.' };
   }
 }
