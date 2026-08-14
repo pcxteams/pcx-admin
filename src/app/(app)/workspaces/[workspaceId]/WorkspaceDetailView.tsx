@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { WorkspaceDetail } from './page';
 import LeadershipTeamEditor from '@/components/LeadershipTeamEditor';
+import VendorsSection, { type ProfileVendor } from '@/components/VendorsSection';
 import CustomizationsSection from '@/components/CustomizationsSection';
 
 const BRAND = '#009689';
@@ -87,7 +88,13 @@ interface FormState {
 
 interface AdditionalLink { label: string; url: string }
 
-export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail }) {
+export default function WorkspaceDetailView({
+  data,
+  vendors,
+}: {
+  data: WorkspaceDetail;
+  vendors: ProfileVendor[];
+}) {
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>({
@@ -424,6 +431,11 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
           <p className={SECTION_SUB}>Teams operating within this Workspace.</p>
           <p className="text-sm text-gray-400">No teams configured.</p>
         </div>
+
+        {/* Vendors — Office Workspaces only (KAN-99) */}
+        {data.type === 'office' && (
+          <VendorsSection workspaceId={data.id} initialVendors={vendors} canManage />
+        )}
 
         {/* Branding */}
         <div className={SECTION}>

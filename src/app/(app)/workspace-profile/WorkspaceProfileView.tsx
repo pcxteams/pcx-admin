@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, Users, Save, Check } from 'lucide-react';
 import LeadershipTeamEditor from '@/components/LeadershipTeamEditor';
+import VendorsSection, { type ProfileVendor } from '@/components/VendorsSection';
 import CustomizationsSection from '@/components/CustomizationsSection';
 import type { WorkspaceProfileData } from './page';
 
@@ -36,7 +37,13 @@ function ReadOnly({ label, value }: { label: string; value: string | number | nu
   );
 }
 
-export default function WorkspaceProfileView({ data }: { data: WorkspaceProfileData }) {
+export default function WorkspaceProfileView({
+  data,
+  vendors,
+}: {
+  data: WorkspaceProfileData;
+  vendors: ProfileVendor[];
+}) {
   const router = useRouter();
   const canManage = data.access.canManage;
 
@@ -181,6 +188,11 @@ export default function WorkspaceProfileView({ data }: { data: WorkspaceProfileD
 
         {/* Leadership Team */}
         <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leadership} canManage={canManage} />
+
+        {/* Vendors — Office Workspaces only (KAN-99) */}
+        {data.type === 'office' && (
+          <VendorsSection workspaceId={data.id} initialVendors={vendors} canManage={canManage} />
+        )}
 
         {/* Customizations — setup progress */}
         <CustomizationsSection
