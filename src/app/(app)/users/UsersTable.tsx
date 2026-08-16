@@ -52,8 +52,19 @@ const TD = 'px-4 py-3.5 text-sm text-gray-700 align-middle';
  * workspace_setup_token are keyed to workspace_id, not user_id, so they'd
  * survive orphaned) — Delete is disabled rather than offered for that case.
  */
-function RowActionsMenu({ user, onDeleteClick }: { user: UsersListItem; onDeleteClick: (user: UsersListItem) => void }) {
+function RowActionsMenu({
+  user,
+  onDeleteClick,
+  onResendClick,
+  isResending,
+}: {
+  user: UsersListItem;
+  onDeleteClick: (user: UsersListItem) => void;
+  onResendClick: (user: UsersListItem) => void;
+  isResending: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const canResend = user.status === 'invited' || user.status === 'pending';
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,6 +91,19 @@ function RowActionsMenu({ user, onDeleteClick }: { user: UsersListItem; onDelete
 
       {open && (
         <div className="absolute right-0 z-50 mt-1 min-w-[140px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+          {canResend && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onResendClick(user);
+              }}
+              disabled={isResending}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
+              {isResending ? 'Sending…' : 'Resend Invite'}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -109,9 +133,11 @@ function RowActionsMenu({ user, onDeleteClick }: { user: UsersListItem; onDelete
 interface UsersTableProps {
   items: UsersListItem[];
   onDeleteClick: (user: UsersListItem) => void;
+  onResendClick: (user: UsersListItem) => void;
+  resendingId: string | null;
 }
 
-export default function UsersTable({ items, onDeleteClick }: UsersTableProps) {
+export default function UsersTable({ items, onDeleteClick, onResendClick, resendingId }: UsersTableProps) {
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 px-6 py-10 text-center text-sm text-gray-400">
@@ -188,7 +214,12 @@ export default function UsersTable({ items, onDeleteClick }: UsersTableProps) {
                   </span>
                 </td>
                 <td className={TD}>
-                  <RowActionsMenu user={u} onDeleteClick={onDeleteClick} />
+                  <RowActionsMenu
+                    user={u}
+                    onDeleteClick={onDeleteClick}
+                    onResendClick={onResendClick}
+                    isResending={resendingId === u.id}
+                  />
                 </td>
               </tr>
             );

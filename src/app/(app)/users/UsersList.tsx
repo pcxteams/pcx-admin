@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
 import UsersFilters from './UsersFilters';
 import UsersTable from './UsersTable';
-import { deleteUser } from '@/lib/users';
+import { deleteUser, resendActivation } from '@/lib/users';
 
 export interface UsersListItem {
   id: string;
@@ -56,6 +56,7 @@ export default function UsersList({
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('all');
   const [status, setStatus] = useState('all');
+  const [leaderType, setLeaderType] = useState('all');
   // Stub filters — held in local state only, never sent to the API.
   const [careerStage, setCareerStage] = useState('all');
   const [lastActive, setLastActive] = useState('all');
@@ -69,6 +70,10 @@ export default function UsersList({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const resendMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstRender = useRef(true);
 
@@ -80,6 +85,7 @@ export default function UsersList({
       if (workspaceId) params.set('workspaceId', workspaceId);
       if (role !== 'all') params.set('role', role);
       if (status !== 'all') params.set('status', status);
+      if (leaderType !== 'all') params.set('leaderType', leaderType);
       params.set('page', String(page));
       params.set('perPage', String(perPage));
 
@@ -90,7 +96,7 @@ export default function UsersList({
     } finally {
       setLoading(false);
     }
-  }, [search, workspaceId, role, status, page, perPage]);
+  }, [search, workspaceId, role, status, leaderType, page, perPage]);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -106,6 +112,20 @@ export default function UsersList({
     await fetchUsers();
   }
 
+  async function handleResend(target: UsersListItem) {
+    setResendingId(target.id);
+    if (resendMessageTimeoutRef.current) clearTimeout(resendMessageTimeoutRef.current);
+    setResendMessage(null);
+    const result = await resendActivation(target.id);
+    setResendingId(null);
+    setResendMessage(
+      result.ok
+        ? { type: 'success', text: `Invite resent to ${target.email}.` }
+        : { type: 'error', text: result.message },
+    );
+    resendMessageTimeoutRef.current = setTimeout(() => setResendMessage(null), 5000);
+  }
+
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -117,6 +137,12 @@ export default function UsersList({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [fetchUsers]);
+
+  useEffect(() => {
+    return () => {
+      if (resendMessageTimeoutRef.current) clearTimeout(resendMessageTimeoutRef.current);
+    };
+  }, []);
 
   const totalPages = Math.max(Math.ceil(data.total / data.perPage), 1);
   const rangeStart = data.total === 0 ? 0 : (data.page - 1) * data.perPage + 1;
@@ -146,14 +172,36 @@ export default function UsersList({
           setStatus(v);
           setPage(1);
         }}
+        leaderType={leaderType}
+        onLeaderTypeChange={(v) => {
+          setLeaderType(v);
+          setPage(1);
+        }}
         careerStage={careerStage}
         onCareerStageChange={setCareerStage}
         lastActive={lastActive}
         onLastActiveChange={setLastActive}
       />
 
+      {resendMessage && (
+        <div
+          className={`mt-4 rounded-lg border px-4 py-2.5 text-sm ${
+            resendMessage.type === 'success'
+              ? 'border-green-200 bg-green-50 text-green-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {resendMessage.text}
+        </div>
+      )}
+
       <div className={`mt-4 transition-opacity ${loading ? 'opacity-60' : ''}`}>
-        <UsersTable items={data.items} onDeleteClick={(u) => { setDeleteTarget(u); setDeleteError(null); }} />
+        <UsersTable
+          items={data.items}
+          onDeleteClick={(u) => { setDeleteTarget(u); setDeleteError(null); }}
+          onResendClick={handleResend}
+          resendingId={resendingId}
+        />
       </div>
 
       <div className="flex items-center justify-between mt-4 flex-wrap gap-3">

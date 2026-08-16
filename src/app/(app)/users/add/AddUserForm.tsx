@@ -42,9 +42,9 @@ const ROLES: { value: CreateUserRole; label: string }[] = [
  * "User Type"/"Workspace Manager" concept. Primary Workspace is shown to
  * PCx Admins and to Managers/Leaders who can access more than one
  * workspace; a single-workspace user has it silently autofilled and
- * hidden. "Additional Workspaces" for Leader/Manager is kept per product
- * (no other flow supports assigning a person to multiple workspaces yet)
- * but isn't part of this ticket's backend, so it's not sent on submit.
+ * hidden. "Additional Workspaces" for Leader/Manager creates one
+ * workspace_membership per selected workspace, same role/visibility as
+ * the Primary Workspace membership.
  */
 export default function AddUserForm() {
   const router = useRouter();
@@ -209,6 +209,10 @@ export default function AddUserForm() {
       additionalLeaderIds: role === 'agent' ? additionalLeaders.map((l) => l.id).filter(Boolean) : undefined,
       productionLevel: role === 'agent' && productionLevel ? productionLevel : undefined,
       visibilityScope: role === 'leader' ? accessLevel : undefined,
+      additionalWorkspaceIds:
+        role === 'leader' || role === 'manager'
+          ? additionalWorkspaces.map((w) => w.id).filter(Boolean)
+          : undefined,
     });
 
     setIsSubmitting(false);
@@ -291,9 +295,9 @@ export default function AddUserForm() {
         </div>
       </div>
 
-      {/* 3. Workspace Assignment */}
+      {/* 2. Workspace & Team Assignment */}
       <div className={CARD_CLASS}>
-        <div className={CARD_HEADER_CLASS}>3. Workspace Assignment</div>
+        <div className={CARD_HEADER_CLASS}>2. Workspace &amp; Team Assignment</div>
         <div className={CARD_BODY_CLASS}>
           {showWorkspacePicker && (
             <div>

@@ -21,7 +21,7 @@ interface Props {
 export default function VisibilityFields({ accessLevel, onAccessLevelChange }: Props) {
   return (
     <div className={CARD_CLASS}>
-      <div className={CARD_HEADER_CLASS}>4. Visibility</div>
+      <div className={CARD_HEADER_CLASS}>3. Visibility</div>
       <div className={CARD_BODY_CLASS}>
         <p className="text-sm text-gray-700 mb-2">Select the access level for this leader</p>
         <div className="grid grid-cols-2 gap-3">

@@ -19,7 +19,7 @@ interface Props {
 export default function ProductionLevelFields({ value, onChange }: Props) {
   return (
     <div className={CARD_CLASS}>
-      <div className={CARD_HEADER_CLASS}>5. Production Information</div>
+      <div className={CARD_HEADER_CLASS}>4. Production Information</div>
       <div className={CARD_BODY_CLASS}>
         <label className="block text-xs font-medium text-gray-700 mb-2">
           Current Production Level <span className="text-red-500">*</span>

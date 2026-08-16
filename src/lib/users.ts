@@ -63,6 +63,7 @@ export interface CreateInvitedUserPayload {
   additionalLeaderIds?: string[];
   productionLevel?: ProductionLevelInput;
   visibilityScope?: VisibilityScopeInput;
+  additionalWorkspaceIds?: string[];
   sendWelcomeEmail?: boolean;
   sendPasswordSetupEmail?: boolean;
 }
@@ -83,6 +84,29 @@ export async function createInvitedUser(
     }
     const data = (await res.json()) as { userId: string };
     return { ok: true, userId: data.userId };
+  } catch {
+    return { ok: false, message: 'Network error. Please check your connection and try again.' };
+  }
+}
+
+/**
+ * Re-sends the activation email for a not-yet-activated user. Backed by a
+ * dedicated endpoint rather than resubmitting the whole Add User form —
+ * see UsersService.resendActivation().
+ */
+export async function resendActivation(
+  id: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`/api/users/${id}/resend-activation`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
+      return { ok: false, message: body.message ?? 'Something went wrong. Please try again.' };
+    }
+    return { ok: true };
   } catch {
     return { ok: false, message: 'Network error. Please check your connection and try again.' };
   }
