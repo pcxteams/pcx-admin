@@ -7,12 +7,21 @@ export type NavItem = {
 export type NavSection = {
   section: string;
   items: NavItem[];
+  /** Platform-level gate (user.role), e.g. 'master'. */
   requiredRole?: string;
+  /**
+   * Workspace-membership-level gate — only 'manager'/'leader' should see
+   * this, not 'agent'. Resolved server-side (not from the platform role,
+   * which can't distinguish an Agent from a Manager/Leader) and passed to
+   * Sidebar as a prop.
+   */
+  requiresWorkspaceAccess?: boolean;
 };
 
 export const navigation: NavSection[] = [
   {
     section: 'PCX PLATFORM',
+    requiredRole: 'master',
     items: [
       { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid' },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
@@ -60,7 +69,7 @@ export const navigation: NavSection[] = [
   },
   {
     section: 'SETTINGS',
-    requiredRole: 'master',
+    requiresWorkspaceAccess: true,
     items: [
       { label: 'Workspace Settings', href: '/settings/workspace', icon: 'Settings2' },
       { label: 'Leader Resources', href: '/settings/leader-resources', icon: 'BookMarked' },
