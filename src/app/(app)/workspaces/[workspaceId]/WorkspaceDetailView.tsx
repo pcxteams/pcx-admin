@@ -44,7 +44,6 @@ function StatusBadge({ status, billingStatus }: { status: string; billingStatus:
     setup_pending: 'bg-gray-100 text-gray-500',
     setup_sent: 'bg-blue-50 text-blue-600',
     setup_viewed: 'bg-purple-50 text-purple-600',
-    setup_submitted: 'bg-amber-50 text-amber-600',
   };
   const label = status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return (
@@ -79,7 +78,7 @@ interface FormState {
   primaryColor: string;
   secondaryColor: string;
   trainingCalendarUrl: string;
-  googleDriveUrl: string;
+  officeCrmUrl: string;
   mlsWebsite: string;
   boardOfRealtorsWebsite: string;
   additionalLinks: { label: string; url: string }[];
@@ -100,7 +99,7 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
     primaryColor: data.brandingConfig?.primary_color ?? '',
     secondaryColor: data.brandingConfig?.secondary_color ?? '',
     trainingCalendarUrl: data.settingsConfig?.training_calendar_url ?? '',
-    googleDriveUrl: data.settingsConfig?.google_drive_url ?? '',
+    officeCrmUrl: data.settingsConfig?.office_crm_url ?? '',
     mlsWebsite: data.settingsConfig?.mls_website ?? '',
     boardOfRealtorsWebsite: data.settingsConfig?.board_of_realtors_website ?? '',
     additionalLinks: data.settingsConfig?.additional_links ?? [],
@@ -136,7 +135,7 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
           },
           settingsConfig: {
             training_calendar_url: form.trainingCalendarUrl || null,
-            google_drive_url: form.googleDriveUrl || null,
+            office_crm_url: form.officeCrmUrl || null,
             mls_website: form.mlsWebsite || null,
             board_of_realtors_website: form.boardOfRealtorsWebsite || null,
             additional_links: form.additionalLinks,
@@ -489,8 +488,8 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
               <input className={`${INPUT} ${INPUT_FOCUS}`} value={form.trainingCalendarUrl} onChange={set('trainingCalendarUrl')} placeholder="https://..." />
             </div>
             <div className={FIELD}>
-              <label className={LABEL}>Google Drive Link</label>
-              <input className={`${INPUT} ${INPUT_FOCUS}`} value={form.googleDriveUrl} onChange={set('googleDriveUrl')} placeholder="https://..." />
+              <label className={LABEL}>Office CRM</label>
+              <input className={`${INPUT} ${INPUT_FOCUS}`} value={form.officeCrmUrl} onChange={set('officeCrmUrl')} placeholder="https://..." />
             </div>
             <div className={FIELD}>
               <label className={LABEL}>MLS Website</label>
@@ -640,22 +639,6 @@ export default function WorkspaceDetailView({ data }: { data: WorkspaceDetail })
             <p className="text-base font-semibold text-red-700">PCx Master Only</p>
           </div>
           <p className="text-sm text-red-500 mb-5">These actions permanently affect this Workspace.</p>
-          {data.status === 'setup_submitted' && (
-            <div className="mb-5 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={async () => {
-                  setActionError(null);
-                  if (await doAction('complete-setup', 'POST')) router.refresh();
-                }}
-                disabled={actionLoading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-teal-400 bg-teal-50 text-sm font-medium text-teal-700 hover:bg-teal-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Complete Setup &amp; Send Activation Email
-              </button>
-              {actionError && <p className="text-sm text-red-600">{actionError}</p>}
-            </div>
-          )}
           <div className="flex items-center gap-3">
             <button
               type="button"
