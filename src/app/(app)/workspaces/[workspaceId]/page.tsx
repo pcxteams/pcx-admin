@@ -22,7 +22,7 @@ export interface WorkspaceDetail {
     mls_website?: string;
     board_of_realtors_website?: string;
     training_calendar_url?: string;
-    google_drive_url?: string;
+    office_crm_url?: string;
     additional_links?: { label: string; url: string }[];
   } | null;
   createdAt: string;
