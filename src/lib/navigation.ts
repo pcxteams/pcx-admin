@@ -9,21 +9,23 @@ export type NavSection = {
   items: NavItem[];
   /** Show only to these platform roles (any match); omit to show to everyone. */
   requiredRoles?: string[];
+  /**
+   * Workspace-membership-level gate — e.g. only 'manager'/'leader' should
+   * see this, not 'agent'. Platform role (requiredRoles above) can't make
+   * this distinction, since Manager/Leader/Agent all share the same
+   * platform role — this is resolved server-side and passed to Sidebar
+   * as a prop instead.
+   */
+  requiresWorkspaceAccess?: boolean;
 };
 
 export const navigation: NavSection[] = [
   {
     section: 'PCX PLATFORM',
+    requiredRoles: ['master'],
     items: [
       { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid' },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
-    ],
-  },
-  {
-    section: 'WORKSPACE',
-    requiredRoles: ['manager', 'leader'],
-    items: [
-      { label: 'Workspace Profile', href: '/workspace-profile', icon: 'Building2' },
     ],
   },
   {
@@ -68,7 +70,7 @@ export const navigation: NavSection[] = [
   },
   {
     section: 'SETTINGS',
-    requiredRoles: ['master'],
+    requiresWorkspaceAccess: true,
     items: [
       { label: 'Workspace Settings', href: '/settings/workspace', icon: 'Settings2' },
       { label: 'Leader Resources', href: '/settings/leader-resources', icon: 'BookMarked' },
