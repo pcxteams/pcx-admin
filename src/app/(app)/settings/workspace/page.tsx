@@ -1,18 +1,16 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
+import type { ProfileLeader } from '@/components/LeadershipTeamEditor';
 import WorkspaceSettingsView from './WorkspaceSettingsView';
 
-export interface WorkspaceSettingsLeader {
-  membershipId: string;
-  userId: string;
+export interface WorkspaceTeamRow {
+  id: string;
   name: string;
-  email: string;
-  phone: string | null;
-  jobTitle: string | null;
-  role: 'manager' | 'leader';
-  isActive: boolean;
+  contactName: string | null;
+  assignedAgents: number;
   lastActive: string | null;
+  status: string;
 }
 
 export interface WorkspaceSettingsProfile {
@@ -22,6 +20,8 @@ export interface WorkspaceSettingsProfile {
   status: string;
   clientFacingName: string | null;
   timeZone: string | null;
+  maxUsers: number | null;
+  subscriptionPlan: string | null;
   brandingConfig: {
     logo_url?: string;
     primary_color?: string;
@@ -41,7 +41,10 @@ export interface WorkspaceSettingsProfile {
   createdAt: string;
   updatedAt: string;
   reportsTo: { id: string; name: string; type: 'office' | 'team' } | null;
-  leadership: WorkspaceSettingsLeader[];
+  leadership: ProfileLeader[];
+  workspaceTeams: WorkspaceTeamRow[];
+  setupCompleted: boolean;
+  customizationCompleted: boolean;
   access: {
     canView: boolean;
     canManage: boolean;
