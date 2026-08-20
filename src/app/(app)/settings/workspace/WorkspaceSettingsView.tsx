@@ -4,6 +4,8 @@ import { useCallback, useId, useState } from 'react';
 import {
   Building2, Users, ExternalLink, Pencil, Trash2, Plus, Check, X,
 } from 'lucide-react';
+import LeadershipTeamEditor from '@/components/LeadershipTeamEditor';
+import CustomizationsSection from '@/components/CustomizationsSection';
 import type { WorkspaceSettingsProfile } from './page';
 
 const BRAND = '#009689';
@@ -41,6 +43,15 @@ function TypeBadge({ type }: { type: 'office' | 'team' }) {
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
       <Icon size={11} />{type === 'office' ? 'Office' : 'Team'}
     </span>
+  );
+}
+
+function ReadOnly({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className={FIELD}>
+      <p className={LABEL}>{label}</p>
+      <p className="text-sm text-gray-900">{value || value === 0 ? value : <span className="text-gray-400">—</span>}</p>
+    </div>
   );
 }
 
@@ -330,6 +341,19 @@ export default function WorkspaceSettingsView({ data }: { data: WorkspaceSetting
             </div>
           </div>
 
+          {/* Subscription — read-only; plan changes are billing/master-only */}
+          <div className={SECTION}>
+            <p className={SECTION_TITLE}>Subscription</p>
+            <p className={SECTION_SUB}>Current plan for this Workspace.</p>
+            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+              <ReadOnly
+                label="Plan"
+                value={data.subscriptionPlan ? data.subscriptionPlan.replace(/\b\w/g, (c) => c.toUpperCase()) : null}
+              />
+              <ReadOnly label="Users" value={data.maxUsers ?? 'Unlimited'} />
+            </div>
+          </div>
+
           {/* Reporting Relationship — read-only; changing it is master-only */}
           <div className={SECTION}>
             <p className={SECTION_TITLE}>Reporting Relationship</p>
@@ -351,6 +375,47 @@ export default function WorkspaceSettingsView({ data }: { data: WorkspaceSetting
               </p>
             )}
           </div>
+
+          {/* Workspace Teams — read-only; only Offices have Teams reporting to them */}
+          {data.type === 'office' && (
+            <div className={SECTION}>
+              <p className={SECTION_TITLE}>Workspace Teams</p>
+              <p className={SECTION_SUB}>Teams operating within this Workspace.</p>
+              {data.workspaceTeams.length === 0 ? (
+                <p className="text-sm text-gray-400">No Teams reporting to this Workspace.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-gray-100">
+                      <tr>
+                        {['Name', 'Team Name', 'Assigned Agents', 'Last Active', 'Status'].map((h) => (
+                          <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {data.workspaceTeams.map((team) => (
+                        <tr key={team.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-semibold shrink-0" style={{ backgroundColor: BRAND }}>
+                                {initials(team.contactName ?? team.name)}
+                              </div>
+                              <span className="font-medium text-gray-900">{team.contactName ?? '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{team.name}</td>
+                          <td className="px-4 py-3 text-gray-600 font-medium">{team.assignedAgents}</td>
+                          <td className="px-4 py-3 text-gray-600">{formatDate(team.lastActive)}</td>
+                          <td className="px-4 py-3"><StatusBadge status={team.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Branding */}
           <div className={SECTION}>
@@ -413,54 +478,12 @@ export default function WorkspaceSettingsView({ data }: { data: WorkspaceSetting
             </div>
           </div>
 
-          {/* Leaders — read-only; editing goes through the Leadership Team on Form 2/3, not here */}
-          <div className={SECTION}>
-            <p className={SECTION_TITLE}>Leaders</p>
-            <p className={SECTION_SUB}>Leaders currently assigned to this Workspace.</p>
-            {data.leadership.length === 0 ? (
-              <p className="text-sm text-gray-400">No leaders assigned.</p>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-gray-100">
-                <table className="w-full text-sm">
-                  <thead className="border-b border-gray-100">
-                    <tr>
-                      {['Name', 'Role', 'Job Title', 'Email', 'Last Active', 'Status'].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {data.leadership.map((l) => (
-                      <tr key={l.userId} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-semibold shrink-0" style={{ backgroundColor: BRAND }}>
-                              {initials(l.name)}
-                            </div>
-                            <span className="font-medium text-gray-900">{l.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 capitalize">{l.role}</td>
-                        <td className="px-4 py-3 text-gray-600">{l.jobTitle ?? '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">{l.email}</td>
-                        <td className="px-4 py-3 text-gray-600">{formatDate(l.lastActive)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${l.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                            {l.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          {/* Leadership Team */}
+          <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leadership} canManage={canManage} />
 
           {/* Office Resources & Quick Links */}
           <div className={SECTION}>
-            <p className={SECTION_TITLE}>Office Resources &amp; Quick Links</p>
+            <p className={SECTION_TITLE}>Office Resources</p>
             <p className={SECTION_SUB}>Resources displayed throughout the Workspace and Agent Office page.</p>
 
             <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-8">
@@ -674,6 +697,12 @@ export default function WorkspaceSettingsView({ data }: { data: WorkspaceSetting
               )}
             </div>
           </div>
+
+          {/* Customizations — setup progress */}
+          <CustomizationsSection
+            setupCompleted={data.setupCompleted}
+            customizationCompleted={data.customizationCompleted}
+          />
         </div>
       </div>
     </div>
