@@ -41,7 +41,13 @@ function NavLink({ item }: { item: NavItem }) {
   );
 }
 
-export default function Sidebar({ user }: { user?: SidebarUser }) {
+export default function Sidebar({
+  user,
+  hasWorkspaceAccess = false,
+}: {
+  user?: SidebarUser;
+  hasWorkspaceAccess?: boolean;
+}) {
   const router = useRouter();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
@@ -95,6 +101,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
               !group.requiredRoles ||
               (!!user?.role && group.requiredRoles.includes(user.role)),
           )
+          .filter((group) => !group.requiresWorkspaceAccess || hasWorkspaceAccess)
           .map((group) => (
             <div key={group.section}>
               <div className="px-5 mb-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
