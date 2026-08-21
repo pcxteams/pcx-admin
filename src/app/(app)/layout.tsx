@@ -5,6 +5,9 @@ import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 
 interface MyWorkspaceProfile {
+  name: string;
+  clientFacingName: string | null;
+  type: 'office' | 'team';
   access: {
     membershipRole: 'manager' | 'leader' | 'agent' | null;
   };
@@ -41,9 +44,16 @@ export default async function AppLayout({
     myWorkspace?.access.membershipRole === 'manager' ||
     myWorkspace?.access.membershipRole === 'leader';
 
+  // Master has no personal workspace (myWorkspace is null for them), so the
+  // header falls back to the PCx Platform branding. Anyone else who resolved
+  // a home workspace here — Manager, Leader, or Agent — sees its name instead.
+  const workspace = myWorkspace
+    ? { name: myWorkspace.clientFacingName || myWorkspace.name, type: myWorkspace.type }
+    : null;
+
   return (
     <div className="h-full flex bg-gray-50">
-      <Sidebar user={session.user} hasWorkspaceAccess={hasWorkspaceAccess} />
+      <Sidebar user={session.user} hasWorkspaceAccess={hasWorkspaceAccess} workspace={workspace} />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
