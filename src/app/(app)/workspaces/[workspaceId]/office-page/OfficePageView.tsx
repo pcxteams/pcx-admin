@@ -629,6 +629,69 @@ function Leadership({ section }: { section: OfficePageSection }) {
   );
 }
 
+/** A live, DB-backed Vendor (KAN-99) — distinct from the builder's `vendor-carousel` items. */
+export interface AgentOfficeVendor {
+  id: string;
+  companyName: string;
+  companyWebsite: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  contactFirstName: string | null;
+  contactLastName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+}
+
+/**
+ * Agent Office → Vendors (KAN-99). Always renders when there are Active
+ * vendors, independent of the builder's `sections` array — this is separate
+ * from the hand-curated `vendor-carousel` section type rendered by
+ * `Vendors()` above, which stays untouched. A Free Team's `activeVendors`
+ * prop already resolves to its Parent Office's vendors server-side.
+ */
+function LiveVendors({ vendors }: { vendors: AgentOfficeVendor[] }) {
+  if (vendors.length === 0) return null;
+  return (
+    <section>
+      <SectionHeader label="Preferred Vendors" />
+      <div className="rounded-xl border border-gray-200 bg-white">
+        {vendors.map((v, i) => {
+          const contactName = [v.contactFirstName, v.contactLastName].filter(Boolean).join(' ');
+          const meta = [contactName, v.contactPhone].filter(Boolean).join(' · ');
+          return (
+            <div
+              key={v.id}
+              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}
+            >
+              {v.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={v.logoUrl} alt={v.companyName} className="h-9 w-9 shrink-0 rounded-full object-cover" />
+              ) : (
+                <Avatar text={initials(v.companyName)} color={pick(AVATAR_COLORS, v.id)} />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900">{v.companyName}</p>
+                {meta && <p className="truncate text-xs text-gray-400">{meta}</p>}
+              </div>
+              {v.companyWebsite && (
+                <a
+                  href={v.companyWebsite}
+                  target={isExternal(v.companyWebsite) ? '_blank' : undefined}
+                  rel={isExternal(v.companyWebsite) ? 'noopener noreferrer' : undefined}
+                  className="shrink-0 text-gray-300 hover:text-blue-600"
+                  aria-label={`Open ${v.companyName}`}
+                >
+                  <Link2 size={15} />
+                </a>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /** Is this quick-links section meant for the "Useful Shortcuts" text-link list? */
 function isShortcuts(section: OfficePageSection): boolean {
   const k = section.key.toLowerCase();
@@ -666,12 +729,18 @@ export function SectionBlock({
   }
 }
 
-export default function OfficePageView({ content }: { content: OfficePageContent }) {
+export default function OfficePageView({
+  content,
+  activeVendors = [],
+}: {
+  content: OfficePageContent;
+  activeVendors?: AgentOfficeVendor[];
+}) {
   const visible = [...content.sections]
     .filter((s) => s.visible)
     .sort((a, b) => a.order - b.order);
 
-  if (visible.length === 0) {
+  if (visible.length === 0 && activeVendors.length === 0) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white px-6 py-12 text-center text-sm text-gray-400">
         This office page has no visible sections yet.
@@ -692,6 +761,7 @@ export default function OfficePageView({ content }: { content: OfficePageContent
             {(section) => <SectionBlock section={section} branding={content.branding} />}
           </SectionRow>
         ))}
+        <LiveVendors vendors={activeVendors} />
         <Footer footer={content.footer} />
       </div>
     </>
