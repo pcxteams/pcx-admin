@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
+import type { ProfileVendor } from '@/components/VendorsSection';
 import WorkspaceDetailView from './WorkspaceDetailView';
 
 export interface WorkspaceDetail {
@@ -66,5 +67,12 @@ export default async function WorkspaceDetailPage({
   const data = await apiGet<WorkspaceDetail>(`/workspaces/${workspaceId}`);
   if (!data) notFound();
 
-  return <WorkspaceDetailView data={data} />;
+  // Vendor invitation is scoped to Office Workspaces (KAN-99) — Team workspaces
+  // don't get their own invite flow, so skip the fetch entirely.
+  const vendorData =
+    data.type === 'office'
+      ? await apiGet<{ vendors: ProfileVendor[] }>(`/workspaces/${workspaceId}/vendors`)
+      : null;
+
+  return <WorkspaceDetailView data={data} vendors={vendorData?.vendors ?? []} />;
 }

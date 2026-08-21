@@ -20,7 +20,11 @@ export default async function AppLayout({
   // Safety net: if the catch-all route group captured a public /setup/* URL
   // (Next.js resolves group conflicts alphabetically and (app) comes first),
   // skip the sidebar and auth check entirely so the public page renders correctly.
-  if (pathname.startsWith('/setup/') || pathname.startsWith('/activate/')) {
+  if (
+    pathname.startsWith('/setup/') ||
+    pathname.startsWith('/activate/') ||
+    pathname.startsWith('/vendor-form/')
+  ) {
     return <>{children}</>;
   }
 
