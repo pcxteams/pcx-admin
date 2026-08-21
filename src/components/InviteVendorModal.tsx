@@ -88,7 +88,7 @@ export default function InviteVendorModal({
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Invite Vendor</h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                Sends the Preferred Vendor Submission Form by email.
+                Send the vendor a link to complete their profile. No account is created until they submit.
               </p>
             </div>
             <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0 mt-0.5">
@@ -106,13 +106,13 @@ export default function InviteVendorModal({
               type="text"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="e.g. Acme Title Co."
+              placeholder="e.g. Acme Title & Escrow"
               className={INPUT_CLASS}
             />
           </div>
           <div>
             <label className={LABEL_CLASS}>
-              Email <span className="text-red-500">*</span>
+              Contact Email <span className="text-red-500">*</span>
             </label>
             <input
               type="email"
@@ -140,7 +140,7 @@ export default function InviteVendorModal({
             disabled={isSubmitting || !companyName.trim() || !email.trim()}
             className="px-5 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Sending…' : 'Send Invite'}
+            {isSubmitting ? 'Sending…' : 'Send Form by Email'}
           </button>
         </div>
       </div>

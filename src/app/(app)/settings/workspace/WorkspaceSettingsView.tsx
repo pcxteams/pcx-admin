@@ -424,6 +424,11 @@ export default function WorkspaceSettingsView({
             </div>
           )}
 
+          {/* Vendors — Office Workspaces only (KAN-99); immediately below Workspace Teams per ticket */}
+          {data.type === 'office' && (
+            <VendorsSection workspaceId={data.id} initialVendors={vendors} canManage={canManage} />
+          )}
+
           {/* Branding */}
           <div className={SECTION}>
             <p className={SECTION_TITLE}>Branding</p>
@@ -487,11 +492,6 @@ export default function WorkspaceSettingsView({
 
           {/* Leadership Team */}
           <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leadership} canManage={canManage} />
-
-          {/* Vendors — Office Workspaces only (KAN-99) */}
-          {data.type === 'office' && (
-            <VendorsSection workspaceId={data.id} initialVendors={vendors} canManage={canManage} />
-          )}
 
           {/* Office Resources & Quick Links */}
           <div className={SECTION}>
