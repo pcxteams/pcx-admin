@@ -5,6 +5,7 @@ import {
   Building2, Users, ExternalLink, Pencil, Trash2, Plus, Check, X,
 } from 'lucide-react';
 import LeadershipTeamEditor from '@/components/LeadershipTeamEditor';
+import VendorsSection, { type ProfileVendor } from '@/components/VendorsSection';
 import CustomizationsSection from '@/components/CustomizationsSection';
 import type { WorkspaceSettingsProfile } from './page';
 
@@ -92,7 +93,13 @@ interface FormState {
   resources: ResourceItem[];
 }
 
-export default function WorkspaceSettingsView({ data }: { data: WorkspaceSettingsProfile }) {
+export default function WorkspaceSettingsView({
+  data,
+  vendors,
+}: {
+  data: WorkspaceSettingsProfile;
+  vendors: ProfileVendor[];
+}) {
   const canManage = data.access.canManage;
   const uid = useId();
 
@@ -480,6 +487,11 @@ export default function WorkspaceSettingsView({ data }: { data: WorkspaceSetting
 
           {/* Leadership Team */}
           <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leadership} canManage={canManage} />
+
+          {/* Vendors — Office Workspaces only (KAN-99) */}
+          {data.type === 'office' && (
+            <VendorsSection workspaceId={data.id} initialVendors={vendors} canManage={canManage} />
+          )}
 
           {/* Office Resources & Quick Links */}
           <div className={SECTION}>

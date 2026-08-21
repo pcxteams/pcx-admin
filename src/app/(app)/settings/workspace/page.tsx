@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 import type { ProfileLeader } from '@/components/LeadershipTeamEditor';
+import type { ProfileVendor } from '@/components/VendorsSection';
 import WorkspaceSettingsView from './WorkspaceSettingsView';
 
 export interface WorkspaceTeamRow {
@@ -74,5 +75,12 @@ export default async function WorkspaceSettingsPage() {
     );
   }
 
-  return <WorkspaceSettingsView data={profile} />;
+  // Vendor invitation is scoped to Office Workspaces (KAN-99) — Team workspaces
+  // don't get their own invite flow, so skip the fetch entirely.
+  const vendorData =
+    profile.type === 'office'
+      ? await apiGet<{ vendors: ProfileVendor[] }>(`/workspaces/${profile.id}/vendors`)
+      : null;
+
+  return <WorkspaceSettingsView data={profile} vendors={vendorData?.vendors ?? []} />;
 }
