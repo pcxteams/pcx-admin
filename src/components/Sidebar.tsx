@@ -100,7 +100,6 @@ export default function Sidebar({
             {workspace ? (workspace.type === 'office' ? 'Office' : 'Team') : 'Platform'}
           </div>
         </div>
-        <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
       </div>
 
       {/* Navigation */}
