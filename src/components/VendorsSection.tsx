@@ -15,6 +15,9 @@ export interface ProfileVendor {
   companyName: string;
   status: 'pending' | 'active';
   inviteEmail: string;
+  contactFirstName: string | null;
+  contactLastName: string | null;
+  contactEmail: string | null;
 }
 
 function StatusBadge({ status }: { status: ProfileVendor['status'] }) {
@@ -107,7 +110,9 @@ export default function VendorsSection({
       <div className="flex items-start justify-between gap-4 mb-1">
         <div>
           <p className={SECTION_TITLE}>Vendors</p>
-          <p className="text-xs text-gray-400">Preferred Vendors invited by this Office Workspace.</p>
+          <p className="text-xs text-gray-400">
+            {vendors.length} vendor{vendors.length === 1 ? '' : 's'}
+          </p>
         </div>
         {canManage && (
           <button
@@ -124,58 +129,70 @@ export default function VendorsSection({
       {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
 
       <div className="mt-5">
-        {vendors.length === 0 ? (
-          <p className="text-sm text-gray-400">No vendors invited yet.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-100">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-100">
-                <tr>
-                  {['Company Name', 'Status', ...(canManage ? ['Actions'] : [])].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase whitespace-nowrap"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {vendors.map((v) => (
-                  <tr key={v.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{v.companyName}</td>
-                    <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
-                    {canManage && (
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => handleSend(v.id)}
-                            disabled={pendingActionId === v.id}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                          >
-                            <Mail size={12} />
-                            {sentId === v.id ? 'Sent!' : 'Send Form by Email'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(v.id)}
-                            disabled={pendingActionId === v.id}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
+        <div className="overflow-x-auto rounded-lg border border-gray-100">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-100">
+              <tr>
+                {['Company Name', 'Contact', 'Email', 'Status', ...(canManage ? ['Actions'] : [])].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {vendors.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={canManage ? 5 : 4}
+                    className="px-4 py-10 text-center text-sm text-gray-400"
+                  >
+                    No vendors yet. Use Invite Vendor to request vendor profile information.
+                  </td>
+                </tr>
+              ) : (
+                vendors.map((v) => {
+                  const contactName = [v.contactFirstName, v.contactLastName].filter(Boolean).join(' ');
+                  return (
+                    <tr key={v.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{v.companyName}</td>
+                      <td className="px-4 py-3 text-gray-600">{contactName || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{v.contactEmail || v.inviteEmail}</td>
+                      <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleSend(v.id)}
+                              disabled={pendingActionId === v.id}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                            >
+                              <Mail size={12} />
+                              {sentId === v.id ? 'Sent!' : 'Send Form by Email'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(v.id)}
+                              disabled={pendingActionId === v.id}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
+                            >
+                              <Trash2 size={12} />
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showInvite && (
