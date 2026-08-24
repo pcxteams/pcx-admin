@@ -54,7 +54,7 @@ export const navigation: NavSection[] = [
     section: 'DEVELOPMENT',
     items: [
       { label: 'Content Manager', href: '/development/content-manager', icon: 'FolderOpen' },
-      { label: 'Learning Paths', href: '/development/learning-paths', icon: 'BookOpen' },
+      { label: 'Career Builder', href: '/development/career-builder', icon: 'Trophy' },
       { label: 'Calendar', href: '/development/calendar', icon: 'Calendar' },
     ],
   },
