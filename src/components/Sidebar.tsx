@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
-  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp,
+  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
   Settings2, BookMarked, PlugZap, ChevronDown, LogOut, type LucideIcon,
 } from 'lucide-react';
 import { navigation, type NavItem } from '@/lib/navigation';
@@ -17,7 +17,7 @@ type SidebarUser = { name: string; email: string; role?: string | null };
 const iconMap: Record<string, LucideIcon> = {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
-  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp,
+  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
   Settings2, BookMarked, PlugZap,
 };
 
