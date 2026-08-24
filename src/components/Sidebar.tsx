@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
-  FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
+  FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
   BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
   Settings2, BookMarked, PlugZap, ChevronDown, LogOut, type LucideIcon,
 } from 'lucide-react';
@@ -16,7 +16,7 @@ type SidebarUser = { name: string; email: string; role?: string | null };
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
-  FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
+  FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
   BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
   Settings2, BookMarked, PlugZap,
 };
@@ -82,6 +82,7 @@ export default function Sidebar({
 
   const displayName = user?.name?.trim() || user?.email || 'Account';
   const initial = displayName.charAt(0).toUpperCase();
+  const isPlatformAdmin = user?.role === 'master' || user?.role === 'admin';
 
   return (
     <aside className="w-56 bg-slate-900 h-screen flex flex-col flex-shrink-0 sticky top-0">
@@ -117,9 +118,14 @@ export default function Sidebar({
                 {group.section}
               </div>
               <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <NavLink key={item.href} item={item} />
-                ))}
+                {group.items
+                  .filter(
+                    (item) =>
+                      !item.hiddenFromAgent || isPlatformAdmin || hasWorkspaceAccess,
+                  )
+                  .map((item) => (
+                    <NavLink key={item.href} item={item} />
+                  ))}
               </div>
             </div>
           ))}
