@@ -4,6 +4,15 @@ import { apiGet } from '@/lib/api';
 import type { ProfileVendor } from '@/components/VendorsSection';
 import WorkspaceDetailView from './WorkspaceDetailView';
 
+export interface WorkspaceTeamRow {
+  id: string;
+  name: string;
+  contactName: string | null;
+  assignedAgents: number;
+  lastActive: string | null;
+  status: string;
+}
+
 export interface WorkspaceDetail {
   id: string;
   name: string;
@@ -52,6 +61,7 @@ export interface WorkspaceDetail {
     isActive: boolean;
     lastActive: string;
   }[];
+  workspaceTeams: WorkspaceTeamRow[];
 }
 
 export default async function WorkspaceDetailPage({

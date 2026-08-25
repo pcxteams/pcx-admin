@@ -424,12 +424,46 @@ export default function WorkspaceDetailView({
         {/* Leadership Team — editable (master can always manage) */}
         <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leaders} canManage />
 
-        {/* Workspace Teams — placeholder */}
-        <div className={SECTION}>
-          <p className={SECTION_TITLE}>Workspace Teams</p>
-          <p className={SECTION_SUB}>Teams operating within this Workspace.</p>
-          <p className="text-sm text-gray-400">No teams configured.</p>
-        </div>
+        {/* Workspace Teams — read-only; only Offices have Teams reporting to them */}
+        {data.type === 'office' && (
+          <div className={SECTION}>
+            <p className={SECTION_TITLE}>Workspace Teams</p>
+            <p className={SECTION_SUB}>Teams operating within this Workspace.</p>
+            {data.workspaceTeams.length === 0 ? (
+              <p className="text-sm text-gray-400">No Teams reporting to this Workspace.</p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-100">
+                    <tr>
+                      {['Name', 'Team Name', 'Assigned Agents', 'Last Active', 'Status'].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {data.workspaceTeams.map((team) => (
+                      <tr key={team.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-semibold shrink-0" style={{ backgroundColor: BRAND }}>
+                              {initials(team.contactName ?? team.name)}
+                            </div>
+                            <span className="font-medium text-gray-900">{team.contactName ?? '—'}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{team.name}</td>
+                        <td className="px-4 py-3 text-gray-600 font-medium">{team.assignedAgents}</td>
+                        <td className="px-4 py-3 text-gray-600">{formatDate(team.lastActive)}</td>
+                        <td className="px-4 py-3"><StatusBadge status={team.status} billingStatus={null} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Vendors — Office Workspaces only (KAN-99) */}
         {data.type === 'office' && (
