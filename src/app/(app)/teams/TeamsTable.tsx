@@ -9,6 +9,9 @@ const PLAN_BADGES: Record<string, { label: string; cls: string }> = {
 };
 
 const STATUS_BADGES: Record<string, { label: string; dot: string; cls: string }> = {
+  setup_pending: { label: 'Pending', dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500' },
+  setup_sent: { label: 'Sent', dot: 'bg-blue-500', cls: 'bg-blue-50 text-blue-600' },
+  setup_viewed: { label: 'Viewed', dot: 'bg-purple-500', cls: 'bg-purple-50 text-purple-600' },
   active: { label: 'Active', dot: 'bg-green-500', cls: 'bg-green-50 text-green-600' },
   archived: { label: 'Archived', dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500' },
 };
