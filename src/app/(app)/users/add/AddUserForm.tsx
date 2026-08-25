@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, X } from 'lucide-react';
@@ -86,7 +86,7 @@ export default function AddUserForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadScope = useCallback(() => {
     fetchMyWorkspaceScope().then((scope) => {
       setMyScope(scope);
       if (scope.mode === 'workspaces' && scope.workspaces.length === 1) {
@@ -96,6 +96,15 @@ export default function AddUserForm() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    loadScope();
+  }, [loadScope]);
+
+  function retryLoadScope() {
+    setMyScope(null);
+    loadScope();
+  }
 
   // Whether any workspace other than the selected Primary Workspace exists
   // at all — with only one workspace in the system (or in scope), there is
@@ -136,6 +145,14 @@ export default function AddUserForm() {
     myScope?.mode === 'all' || (myScope?.mode === 'workspaces' && myScope.workspaces.length > 1);
   const singleAutofilledWorkspace =
     myScope?.mode === 'workspaces' && myScope.workspaces.length === 1 ? myScope.workspaces[0] : null;
+  // Distinguish "still loading" from "resolved to nothing usable". Without
+  // this, a failed/empty scope silently hid the picker while Team/Primary
+  // Leader stayed stuck on "Select a workspace first" (the Aug 21 QA report)
+  // — now it surfaces a loading state or an explicit error with retry.
+  const scopeLoading = myScope === null;
+  const scopeUnavailable =
+    myScope?.mode === 'none' ||
+    (myScope?.mode === 'workspaces' && myScope.workspaces.length === 0);
 
   async function fetchMyScopeOptions(query: string): Promise<WorkspaceOption[]> {
     if (!myScope || myScope.mode !== 'workspaces') return [];
@@ -299,6 +316,21 @@ export default function AddUserForm() {
       <div className={CARD_CLASS}>
         <div className={CARD_HEADER_CLASS}>2. Workspace &amp; Team Assignment</div>
         <div className={CARD_BODY_CLASS}>
+          {scopeLoading && (
+            <p className="text-sm text-gray-400">Loading your workspaces…</p>
+          )}
+          {scopeUnavailable && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              We couldn&apos;t load the workspaces you can add users to.{' '}
+              <button
+                type="button"
+                onClick={retryLoadScope}
+                className="font-medium underline underline-offset-2 hover:text-amber-900 cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          )}
           {showWorkspacePicker && (
             <div>
               <label className={LABEL_CLASS}>

@@ -45,15 +45,23 @@ export default function AssignedLeaderFields({
   onAdditionalLeadersChange,
 }: Props) {
   const disabled = !workspaceId;
-  // Only meaningful while workspaceId is set — derived below rather than
-  // reset via a synchronous setState branch in the effect.
-  const [fetchedSingleLeader, setFetchedSingleLeader] = useState<LeaderValue | null>(null);
-  const lockedSingleLeader = workspaceId ? fetchedSingleLeader : null;
-  // Total eligible leader pool size for this workspace (independent of how
-  // many are already selected) — used to disable "Add Another Leader" once
-  // every eligible leader has already been picked as primary/additional.
-  // Defaults to true while unresolved so the button doesn't flash disabled.
-  const [eligibleCount, setEligibleCount] = useState<number | null>(null);
+  // The resolved eligible-leader pool, tagged with the workspace it was
+  // fetched for. Keying it this way (rather than clearing state synchronously
+  // in the effect — which would trip react-hooks/set-state-in-effect) means a
+  // previous workspace's single-leader lock / count can never leak into a
+  // newly-selected workspace: `current` is null until this workspace's own
+  // fetch resolves.
+  const [fetched, setFetched] = useState<{
+    workspaceId: string;
+    singleLeader: LeaderValue | null;
+    count: number;
+  } | null>(null);
+  const current = fetched && fetched.workspaceId === workspaceId ? fetched : null;
+  const lockedSingleLeader = current?.singleLeader ?? null;
+  // Total eligible leader pool size — used to disable "Add Another Leader"
+  // once every eligible leader is already picked. Null (unresolved) keeps the
+  // button enabled so it doesn't flash disabled while a fetch is in flight.
+  const eligibleCount = current?.count ?? null;
   const hasOtherLeaders = eligibleCount === null ? true : eligibleCount > additionalLeaders.length + 1;
 
   useEffect(() => {
@@ -61,12 +69,10 @@ export default function AssignedLeaderFields({
     let cancelled = false;
     fetchLeaderOptions(workspaceId, '').then((options) => {
       if (cancelled) return;
-      setEligibleCount(options.length);
-      if (options.length === 1) {
-        setFetchedSingleLeader(options[0]);
-        onPrimaryLeaderChange({ id: options[0].id, label: options[0].label });
-      } else {
-        setFetchedSingleLeader(null);
+      const singleLeader = options.length === 1 ? options[0] : null;
+      setFetched({ workspaceId, singleLeader, count: options.length });
+      if (singleLeader) {
+        onPrimaryLeaderChange({ id: singleLeader.id, label: singleLeader.label });
       }
     });
     return () => {
