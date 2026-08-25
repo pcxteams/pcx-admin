@@ -21,6 +21,15 @@ const STATUS_OPTIONS = [
   { value: 'archived', label: 'Archived' },
 ];
 
+// Full vs Limited mirrors workspace_membership.visibility_scope
+// ('workspace' vs 'assigned_agents') for role='leader' rows — a real,
+// backend-enforced filter, not a stub like Career Stage/Last Active below.
+const LEADER_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Leader Types' },
+  { value: 'full', label: 'Full Leader' },
+  { value: 'limited', label: 'Limited Leader' },
+];
+
 // Stub filters below: rendered and fully interactive, but there is no
 // backing field in the schema yet (no career-stage or activity-tracking
 // columns), so choosing an option never changes the query. See the
@@ -63,6 +72,8 @@ interface UsersFiltersProps {
   onRoleChange: (v: string) => void;
   status: string;
   onStatusChange: (v: string) => void;
+  leaderType: string;
+  onLeaderTypeChange: (v: string) => void;
   careerStage: string;
   onCareerStageChange: (v: string) => void;
   lastActive: string;
@@ -96,6 +107,12 @@ export default function UsersFilters(props: UsersFiltersProps) {
 
       <FilterDropdown label="User Role" options={ROLE_OPTIONS} value={props.role} onChange={props.onRoleChange} />
       <FilterDropdown label="Status" options={STATUS_OPTIONS} value={props.status} onChange={props.onStatusChange} />
+      <FilterDropdown
+        label="Leader Type"
+        options={LEADER_TYPE_OPTIONS}
+        value={props.leaderType}
+        onChange={props.onLeaderTypeChange}
+      />
       <FilterDropdown
         label="Career Stage"
         options={CAREER_STAGE_OPTIONS}

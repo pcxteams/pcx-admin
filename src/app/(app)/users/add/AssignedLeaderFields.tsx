@@ -97,7 +97,7 @@ export default function AssignedLeaderFields({
 
   return (
     <div className={CARD_CLASS}>
-      <div className={CARD_HEADER_CLASS}>4. Assigned Leader</div>
+      <div className={CARD_HEADER_CLASS}>3. Leader Assignment</div>
       <div className={CARD_BODY_CLASS}>
         <div>
           <label className={LABEL_CLASS}>
