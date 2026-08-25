@@ -2,6 +2,16 @@ export type NavItem = {
   label: string;
   href: string;
   icon: string;
+  /**
+   * Item-level gate for a single entry within an otherwise-inclusive
+   * section (e.g. ENGAGEMENT, visible to Agents for its other items) — true
+   * hides this item from Agents specifically, while still showing it to
+   * Master/PCx Admin (platform roles) and to Manager/Leader (workspace
+   * access). Distinct from NavSection's requiresWorkspaceAccess, which also
+   * hides from Master/Admin since it gates entire sections meant only for
+   * workspace members.
+   */
+  hiddenFromAgent?: boolean;
 };
 
 export type NavSection = {
@@ -9,21 +19,23 @@ export type NavSection = {
   items: NavItem[];
   /** Show only to these platform roles (any match); omit to show to everyone. */
   requiredRoles?: string[];
+  /**
+   * Workspace-membership-level gate — e.g. only 'manager'/'leader' should
+   * see this, not 'agent'. Platform role (requiredRoles above) can't make
+   * this distinction, since Manager/Leader/Agent all share the same
+   * platform role — this is resolved server-side and passed to Sidebar
+   * as a prop instead.
+   */
+  requiresWorkspaceAccess?: boolean;
 };
 
 export const navigation: NavSection[] = [
   {
     section: 'PCX PLATFORM',
+    requiredRoles: ['master'],
     items: [
       { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid' },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
-    ],
-  },
-  {
-    section: 'WORKSPACE',
-    requiredRoles: ['manager', 'leader'],
-    items: [
-      { label: 'Workspace Profile', href: '/workspace-profile', icon: 'Building2' },
     ],
   },
   {
@@ -44,6 +56,7 @@ export const navigation: NavSection[] = [
     section: 'ENGAGEMENT',
     items: [
       { label: 'Users', href: '/users', icon: 'Users' },
+      { label: 'Teams', href: '/teams', icon: 'UsersRound', hiddenFromAgent: true },
       { label: 'Assignments', href: '/team/assignments', icon: 'ClipboardList' },
       { label: 'Communications', href: '/team/communications', icon: 'MessageSquare' },
     ],
@@ -52,7 +65,7 @@ export const navigation: NavSection[] = [
     section: 'DEVELOPMENT',
     items: [
       { label: 'Content Manager', href: '/development/content-manager', icon: 'FolderOpen' },
-      { label: 'Learning Paths', href: '/development/learning-paths', icon: 'BookOpen' },
+      { label: 'Career Builder', href: '/development/career-builder', icon: 'Trophy' },
       { label: 'Calendar', href: '/development/calendar', icon: 'Calendar' },
     ],
   },
@@ -68,7 +81,7 @@ export const navigation: NavSection[] = [
   },
   {
     section: 'SETTINGS',
-    requiredRoles: ['master'],
+    requiresWorkspaceAccess: true,
     items: [
       { label: 'Workspace Settings', href: '/settings/workspace', icon: 'Settings2' },
       { label: 'Leader Resources', href: '/settings/leader-resources', icon: 'BookMarked' },

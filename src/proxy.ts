@@ -13,6 +13,9 @@ function isPublic(pathname: string): boolean {
   if (pathname.startsWith('/api/workspace-setup/')) return true;
   if (pathname.startsWith('/activate/')) return true;
   if (pathname.startsWith('/api/activate/')) return true;
+  // Preferred Vendor Submission Form, reached via an emailed token link (KAN-99).
+  if (pathname.startsWith('/vendor-form/')) return true;
+  if (pathname.startsWith('/api/vendor-form/')) return true;
   return false;
 }
 

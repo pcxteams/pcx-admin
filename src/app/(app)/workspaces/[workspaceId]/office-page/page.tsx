@@ -4,7 +4,7 @@ import { ArrowLeft, Lock, PencilLine } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 import type { OfficePagePublishedResponse } from '@/lib/office-page-content';
-import OfficePageView from './OfficePageView';
+import OfficePageView, { type AgentOfficeVendor } from './OfficePageView';
 
 function StatusBadge({ status }: { status: OfficePagePublishedResponse['pageStatus'] }) {
   const map: Record<string, string> = {
@@ -36,9 +36,13 @@ export default async function OfficePagePage({
   // The read/"Agent Office" surface must only ever show published content — the
   // published endpoint returns null content until the page is published, never
   // the in-progress draft (that lives behind the builder, gated on canEdit).
-  const data = await apiGet<OfficePagePublishedResponse>(
-    `/workspaces/${workspaceId}/office-page/published`,
-  );
+  const [data, vendorData] = await Promise.all([
+    apiGet<OfficePagePublishedResponse>(`/workspaces/${workspaceId}/office-page/published`),
+    // Live, DB-backed Vendors (KAN-99) — resolved server-side for Free Team
+    // inheritance, independent of whether the page itself has been published.
+    apiGet<{ vendors: AgentOfficeVendor[] }>(`/workspaces/${workspaceId}/vendors/active`),
+  ]);
+  const activeVendors = vendorData?.vendors ?? [];
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -83,8 +87,11 @@ export default async function OfficePagePage({
             )}
           </div>
 
-          {data.content ? (
-            <OfficePageView content={data.content} />
+          {data.content || activeVendors.length > 0 ? (
+            // Vendors publish immediately on form submission (KAN-99), independent
+            // of the builder's own publish step — shown even if the rest of the
+            // office page content hasn't been published yet.
+            <OfficePageView content={data.content ?? { sections: [] }} activeVendors={activeVendors} />
           ) : (
             <div className="rounded-xl border border-gray-100 bg-white px-6 py-16 text-center">
               <p className="text-sm text-gray-500">

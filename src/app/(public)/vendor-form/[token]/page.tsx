@@ -1,10 +1,10 @@
-import EmailVerificationGate from './EmailVerificationGate';
+import VendorSubmissionForm from './VendorSubmissionForm';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3001';
 
 async function fetchContext(token: string) {
   try {
-    const res = await fetch(`${API_URL}/workspace-setup/${token}`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/vendor-form/${token}`, { cache: 'no-store' });
     return { status: res.status, data: res.ok ? await res.json() : null };
   } catch {
     return { status: 500, data: null };
@@ -25,7 +25,7 @@ function ErrorCard({ title, body }: { title: string; body: string }) {
   );
 }
 
-export default async function SetupPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function VendorFormPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const { status, data } = await fetchContext(token);
 
@@ -33,7 +33,7 @@ export default async function SetupPage({ params }: { params: Promise<{ token: s
     return (
       <ErrorCard
         title="Link no longer active"
-        body="This setup link has already been used or has expired. Please contact your workspace administrator for assistance."
+        body="This form link has already been used or has expired. Please contact the office that invited you for a new link."
       />
     );
   }
@@ -42,10 +42,10 @@ export default async function SetupPage({ params }: { params: Promise<{ token: s
     return (
       <ErrorCard
         title="Invalid link"
-        body="This setup link is not valid. Please check the link in your email or contact your administrator."
+        body="This form link is not valid. Please check the link in your email or contact the office that invited you."
       />
     );
   }
 
-  return <EmailVerificationGate initialContext={data} token={token} />;
+  return <VendorSubmissionForm prefill={data} token={token} />;
 }
