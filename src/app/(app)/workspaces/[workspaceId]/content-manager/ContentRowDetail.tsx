@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import {
   TYPE_META, formatDate, estTimeLabel, verificationTypeLabel, LEADER_ACTION_LABEL,
+  buildVideoEmbedSrc,
   type ContentItemDetail, type ExternalLinkConfig, type ResourceConfig,
-  type LeaderVerificationConfig,
+  type LeaderVerificationConfig, type VideoConfig, type VideoEmbedProvider,
 } from '@/lib/content';
 import { TypeIcon } from './content-icons';
 
@@ -175,6 +176,12 @@ function Preview({
   const meta = TYPE_META[detail.type];
 
   if (detail.type === 'video') {
+    const cfg = detail.config as VideoConfig;
+    if (cfg.source === 'embed' && cfg.provider && cfg.embedId) {
+      return (
+        <VideoEmbedPreview title={detail.title} provider={cfg.provider} embedId={cfg.embedId} />
+      );
+    }
     return (
       <VideoPreview
         detail={detail}
@@ -225,6 +232,35 @@ function Preview({
     <div className="shrink-0">
       <div className={`w-56 h-32 rounded-lg ${meta.iconBg} flex items-center justify-center`}>
         <TypeIcon type={detail.type} iconColor={meta.iconColor} iconBg="bg-transparent" size={34} tile="w-16 h-16" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inline YouTube/Vimeo player. Uses each provider's restricted embed endpoint
+ * (no related-video rail, no title/byline/branding chrome) so the viewer never
+ * leaves PCx and isn't shown unrelated recommendations.
+ */
+function VideoEmbedPreview({
+  title, provider, embedId,
+}: {
+  title: string;
+  provider: VideoEmbedProvider;
+  embedId: string;
+}) {
+  return (
+    <div className="shrink-0">
+      <div className="w-56 h-32 rounded-lg overflow-hidden bg-slate-800">
+        <iframe
+          key={`${provider}:${embedId}`}
+          src={buildVideoEmbedSrc(provider, embedId)}
+          title={title}
+          className="w-full h-full"
+          frameBorder={0}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+        />
       </div>
     </div>
   );
