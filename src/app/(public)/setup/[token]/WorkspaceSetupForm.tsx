@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useId, useRef, useCallback } from 'react';
-import { Building2, Users, Plus, X, CheckCircle, ImageIcon, Upload, Loader2 } from 'lucide-react';
+import { Building2, Users, Plus, X, CheckCircle, Lock, Upload, Loader2 } from 'lucide-react';
+import WorkspaceCustomizationForm from './WorkspaceCustomizationForm';
 
 interface Prefill {
   workspaceId: string;
   workspaceName: string;
   workspaceType: 'office' | 'team';
   parentWorkspaceName: string | null;
-  primaryContactName: string;
+  primaryContactFirstName: string;
+  primaryContactLastName: string;
   primaryContactEmail: string;
   expiresAt: string;
 }
@@ -25,15 +27,8 @@ interface Leader {
   showProfile: boolean;
 }
 
-interface AdditionalLink {
-  _key: string;
-  label: string;
-  url: string;
-}
-
 const INPUT = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500';
 const INPUT_ERROR = 'w-full rounded-lg border border-red-400 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent';
-const LABEL = 'block text-xs font-medium text-gray-700 mb-1';
 
 function isValidUrl(value: string): boolean {
   if (!value.trim()) return true;
@@ -56,52 +51,38 @@ const TIMEZONES = [
   { value: 'Pacific/Honolulu',    label: 'Pacific/Honolulu (HST)' },
 ];
 
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID',
+  'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO',
+  'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA',
+  'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+];
+
 function SectionHeader({ n, title, subtitle }: { n: number; title: string; subtitle?: string }) {
   return (
-    <div className="flex items-start gap-3 mb-5">
-      <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-semibold shrink-0 mt-0.5">
-        {n}
-      </div>
-      <div>
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-        {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
-      </div>
+    <div className="mb-5">
+      <h2 className="text-base font-semibold text-gray-900">{n}. {title}</h2>
+      {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
     </div>
   );
 }
 
-function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const pickerRef = useRef<HTMLInputElement>(null);
-  const isValidHex = /^#[0-9a-fA-F]{6}$/.test(value);
-
+function PreFilledBadge() {
   return (
-    <div>
-      <label className={LABEL}>{label}</label>
-      <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-transparent">
-        <div className="relative shrink-0">
-          <div
-            className="w-6 h-6 rounded border border-gray-200 cursor-pointer"
-            style={{ background: isValidHex ? value : '#ffffff' }}
-            onClick={() => pickerRef.current?.click()}
-          />
-          <input
-            ref={pickerRef}
-            type="color"
-            value={isValidHex ? value : '#000000'}
-            onChange={(e) => onChange(e.target.value)}
-            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-            tabIndex={-1}
-          />
-        </div>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="#000000"
-          maxLength={7}
-          className="flex-1 text-sm text-gray-900 placeholder-gray-400 outline-none bg-transparent"
-        />
-      </div>
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-semibold tracking-wide uppercase">
+      <Lock size={9} />
+      Pre-filled
+    </span>
+  );
+}
+
+function FieldLabel({ children, required, locked }: { children: React.ReactNode; required?: boolean; locked?: boolean }) {
+  return (
+    <div className="flex items-center gap-2 mb-1">
+      <label className="text-xs font-medium text-gray-700">
+        {children} {required && <span className="text-red-500">*</span>}
+      </label>
+      {locked && <PreFilledBadge />}
     </div>
   );
 }
@@ -131,7 +112,7 @@ function LeaderCard({
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={LABEL}>Name <span className="text-red-500">*</span></label>
+            <FieldLabel required>Full Name</FieldLabel>
             <input
               type="text"
               value={leader.name}
@@ -141,7 +122,7 @@ function LeaderCard({
             />
           </div>
           <div>
-            <label className={LABEL}>Email Address <span className="text-red-500">*</span></label>
+            <FieldLabel required>Email</FieldLabel>
             <input
               type="email"
               value={leader.email}
@@ -152,89 +133,17 @@ function LeaderCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={LABEL}>Phone Number</label>
-            <input
-              type="text"
-              value={leader.phone}
-              onChange={(e) => onChange({ phone: e.target.value })}
-              placeholder="(555) 000-0000"
-              className={INPUT}
-            />
-          </div>
-          <div>
-            <label className={LABEL}>Job Title</label>
-            <input
-              type="text"
-              value={leader.jobTitle}
-              onChange={(e) => onChange({ jobTitle: e.target.value })}
-              placeholder="e.g. Office Principal"
-              className={INPUT}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className={LABEL}>Role</label>
-            <select
-              value={leader.role}
-              onChange={(e) => onChange({ role: e.target.value as Leader['role'] })}
-              className={INPUT}
-            >
-              <option value="leader">Leader</option>
-              <option value="manager">Workspace Manager</option>
-            </select>
-          </div>
-          <div>
-            <label className={LABEL}>Permission Level</label>
-            <select
-              value={leader.canEditSettings ? 'yes' : 'no'}
-              onChange={(e) => onChange({ canEditSettings: e.target.value === 'yes' })}
-              className={INPUT}
-            >
-              <option value="yes">Can Edit Settings &amp; Customizations</option>
-              <option value="no">Cannot Edit Settings &amp; Customizations</option>
-            </select>
-          </div>
-          <div>
-            <label className={LABEL}>Visibility Scope</label>
-            <select
-              value={leader.visibilityScope}
-              onChange={(e) => onChange({ visibilityScope: e.target.value as Leader['visibilityScope'] })}
-              className={INPUT}
-            >
-              <option value="workspace">Entire Workspace</option>
-              <option value="assigned_agents">Assigned Agents Only</option>
-            </select>
-          </div>
-        </div>
-
         <div>
-          <label className={LABEL}>Leader Profile — Display on Agent Office Home Page?</label>
-          <div className="flex items-center gap-2 mt-1">
-            {(['yes', 'no'] as const).map((opt) => {
-              const active = leader.showProfile ? opt === 'yes' : opt === 'no';
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => onChange({ showProfile: opt === 'yes' })}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    active
-                      ? 'bg-teal-50 border-teal-500 text-teal-700'
-                      : 'bg-white border-gray-200 text-gray-500'
-                  }`}
-                >
-                  {opt === 'yes' ? 'Yes' : 'No'}
-                </button>
-              );
-            })}
-            <span className="text-xs text-gray-400 ml-1">
-              Determines whether this Leader appears on the Agent Office page.
-            </span>
-          </div>
+          <FieldLabel required>Role</FieldLabel>
+          <select
+            value={leader.role}
+            onChange={(e) => onChange({ role: e.target.value as Leader['role'] })}
+            className={INPUT}
+          >
+            <option value="leader">Leader</option>
+            <option value="manager">Manager</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-400">Determines this person&apos;s access level within the workspace.</p>
         </div>
       </div>
     </div>
@@ -244,18 +153,20 @@ function LeaderCard({
 export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefill; token: string }) {
   const uid = useId();
 
-  const [clientFacingName, setClientFacingName] = useState(prefill.workspaceName);
+  const companyName = prefill.workspaceName;
+  const [legalBusinessName, setLegalBusinessName] = useState('');
   const [timeZone, setTimeZone] = useState('America/Phoenix');
-  const [primaryColor, setPrimaryColor] = useState('#0d9488');
-  const [secondaryColor, setSecondaryColor] = useState('#6366f1');
+  const [primaryContactPhone, setPrimaryContactPhone] = useState('');
+  const [primaryContactTitle, setPrimaryContactTitle] = useState('');
   const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zip, setZip] = useState('');
+  const [country, setCountry] = useState('United States');
   const [website, setWebsite] = useState('');
+  const [workspaceEmail, setWorkspaceEmail] = useState('');
+  const [workspacePhone, setWorkspacePhone] = useState('');
   const [leaders, setLeaders] = useState<Leader[]>([]);
-  const [mlsWebsite, setMlsWebsite] = useState('');
-  const [boardOfRealtorsWebsite, setBoardOfRealtorsWebsite] = useState('');
-  const [trainingCalendarUrl, setTrainingCalendarUrl] = useState('');
-  const [googleDriveUrl, setGoogleDriveUrl] = useState('');
-  const [additionalLinks, setAdditionalLinks] = useState<AdditionalLink[]>([]);
 
   const [urlErrors, setUrlErrors] = useState<Record<string, string>>({});
 
@@ -269,6 +180,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [customizationToken, setCustomizationToken] = useState<string | null>(null);
 
   function validateUrl(key: string, value: string) {
     setUrlErrors((prev) => {
@@ -285,9 +197,9 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
   }
 
   const handleLogoSelect = useCallback(async (file: File) => {
-    const allowed = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+    const allowed = ['image/png', 'image/jpeg', 'image/svg+xml'];
     if (!allowed.includes(file.type)) {
-      setLogoError('Only PNG, JPG, SVG, or WebP files are allowed.');
+      setLogoError('Only PNG, JPG, or SVG files are allowed.');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -330,6 +242,10 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         _key: `${uid}-${Date.now()}`,
         name: '',
         email: '',
+        // Leadership Team is trimmed to Name/Email/Role at setup time — no
+        // Limited Leader (assigned_agents) option here; these fixed defaults
+        // give every leader full workspace access, editable later via the
+        // Workspace Profile if that changes.
         phone: '',
         jobTitle: '',
         role: 'leader',
@@ -348,23 +264,43 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
     setLeaders((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function addLink() {
-    setAdditionalLinks((prev) => [...prev, { _key: `${uid}-link-${Date.now()}`, label: '', url: '' }]);
-  }
-
-  function updateLink(index: number, patch: Partial<AdditionalLink>) {
-    setAdditionalLinks((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
-  }
-
-  function removeLink(index: number) {
-    setAdditionalLinks((prev) => prev.filter((_, i) => i !== index));
-  }
-
   async function handleSubmit() {
     setSubmitError(null);
 
-    if (!clientFacingName.trim()) {
-      setSubmitError('Client-Facing Company Name is required.');
+    if (!legalBusinessName.trim()) {
+      setSubmitError('Legal Business Name is required.');
+      return;
+    }
+    if (!workspaceEmail.trim()) {
+      setSubmitError('Workspace Email is required.');
+      return;
+    }
+    if (!workspacePhone.trim()) {
+      setSubmitError('Workspace Phone is required.');
+      return;
+    }
+    if (!address.trim()) {
+      setSubmitError('Physical Address is required.');
+      return;
+    }
+    if (!city.trim()) {
+      setSubmitError('City is required.');
+      return;
+    }
+    if (!state.trim()) {
+      setSubmitError('State is required.');
+      return;
+    }
+    if (!zip.trim()) {
+      setSubmitError('ZIP Code is required.');
+      return;
+    }
+    if (!country.trim()) {
+      setSubmitError('Country is required.');
+      return;
+    }
+    if (!primaryContactPhone.trim()) {
+      setSubmitError('Primary Point of Contact phone number is required.');
       return;
     }
     for (const [i, leader] of leaders.entries()) {
@@ -378,14 +314,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
       }
     }
 
-    const urlFields: [string, string][] = [
-      ['website', website],
-      ['mlsWebsite', mlsWebsite],
-      ['boardOfRealtorsWebsite', boardOfRealtorsWebsite],
-      ['trainingCalendarUrl', trainingCalendarUrl],
-      ['googleDriveUrl', googleDriveUrl],
-      ...additionalLinks.map((l): [string, string] => [`additionalLink-${l._key}`, l.url]),
-    ];
+    const urlFields: [string, string][] = [['website', website]];
     const newUrlErrors: Record<string, string> = {};
     for (const [key, val] of urlFields) {
       if (val.trim() && !isValidUrl(val)) {
@@ -404,13 +333,19 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientFacingName: clientFacingName.trim(),
+          legalBusinessName: legalBusinessName.trim(),
           timeZone,
+          primaryContactPhone: primaryContactPhone.trim(),
+          primaryContactTitle: primaryContactTitle.trim() || undefined,
           logoUrl: logoUrl || undefined,
-          primaryColor: primaryColor || undefined,
-          secondaryColor: secondaryColor || undefined,
-          address: address.trim() || undefined,
+          address: address.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          zip: zip.trim(),
+          country: country.trim(),
           website: website.trim() || undefined,
+          workspaceEmail: workspaceEmail.trim(),
+          workspacePhone: workspacePhone.trim(),
           leaders: leaders.map((l) => ({
             name: l.name.trim(),
             email: l.email.trim(),
@@ -421,13 +356,6 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
             visibilityScope: l.visibilityScope,
             showProfile: l.showProfile,
           })),
-          mlsWebsite: mlsWebsite.trim() || undefined,
-          boardOfRealtorsWebsite: boardOfRealtorsWebsite.trim() || undefined,
-          trainingCalendarUrl: trainingCalendarUrl.trim() || undefined,
-          googleDriveUrl: googleDriveUrl.trim() || undefined,
-          additionalLinks: additionalLinks
-            .filter((l) => l.label.trim() && l.url.trim())
-            .map(({ label, url }) => ({ label, url })),
         }),
       });
 
@@ -437,12 +365,24 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
         return;
       }
 
+      const body = await res.json() as { customizationToken: string };
+      setCustomizationToken(body.customizationToken);
       setSubmitted(true);
     } catch {
       setSubmitError('Network error. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (submitted && customizationToken) {
+    return (
+      <WorkspaceCustomizationForm
+        token={customizationToken}
+        workspaceName={companyName}
+        leaders={leaders.map((l) => ({ name: l.name, email: l.email }))}
+      />
+    );
   }
 
   if (submitted) {
@@ -452,10 +392,10 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
           <div className="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-5">
             <CheckCircle size={28} className="text-teal-600" />
           </div>
-          <h1 className="text-lg font-semibold text-gray-900 mb-2">You're All Set!</h1>
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">You&apos;re All Set!</h1>
           <p className="text-sm text-gray-500">
-            Your workspace setup has been submitted. 
-            We'll begin setting up your workspace and creating your account.
+            Your workspace setup has been submitted.
+            We&apos;ll begin setting up your workspace and creating your account.
           </p>
         </div>
       </div>
@@ -467,15 +407,10 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-base font-semibold text-gray-900">Workspace Setup Form</h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <WorkspaceIcon size={11} className="text-gray-400 shrink-0" />
-              <span className="text-xs text-gray-400 truncate">{prefill.workspaceName}</span>
-            </div>
-          </div>
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-2xl mx-auto px-4 py-6">
+          <h1 className="text-2xl font-bold text-gray-900">Workspace Setup</h1>
+          <p className="text-sm text-gray-500 mt-1">Complete your workspace details to get started.</p>
         </div>
       </div>
 
@@ -487,29 +422,100 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
           <SectionHeader n={1} title="Workspace Information" />
           <div className="space-y-4">
             <div>
-              <label className={LABEL}>Workspace Name (Internal)</label>
-              <input type="text" value={prefill.workspaceName} disabled className={INPUT} />
+              <FieldLabel locked>Workspace Type</FieldLabel>
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                <WorkspaceIcon size={14} className="text-gray-400" />
+                {prefill.workspaceType === 'office' ? 'Office' : 'Team'}
+              </div>
             </div>
+
             {prefill.parentWorkspaceName && (
               <div>
-                <label className={LABEL}>Parent Workspace</label>
+                <FieldLabel locked>Reports To</FieldLabel>
                 <input type="text" value={prefill.parentWorkspaceName} disabled className={INPUT} />
               </div>
             )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel locked>Company Name</FieldLabel>
+                <input type="text" value={companyName} disabled className={INPUT} />
+                <p className="mt-1 text-xs text-gray-400">
+                  This name is shown to agents on their homepage, in emails, and other client-facing areas of the platform.
+                </p>
+              </div>
+              <div>
+                <FieldLabel required>Legal Business Name</FieldLabel>
+                <input
+                  type="text"
+                  value={legalBusinessName}
+                  onChange={(e) => setLegalBusinessName(e.target.value)}
+                  placeholder="e.g. Sunbelt Realty LLC"
+                  className={INPUT}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel required>Workspace Email</FieldLabel>
+                <input
+                  type="email"
+                  value={workspaceEmail}
+                  onChange={(e) => setWorkspaceEmail(e.target.value)}
+                  placeholder="info@yourbrokerage.com"
+                  className={INPUT}
+                />
+              </div>
+              <div>
+                <FieldLabel required>Workspace Phone</FieldLabel>
+                <input
+                  type="tel"
+                  value={workspacePhone}
+                  onChange={(e) => setWorkspacePhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className={INPUT}
+                />
+              </div>
+            </div>
+
             <div>
-              <label className={LABEL}>
-                Client-Facing Company Name <span className="text-red-500">*</span>
-              </label>
+              <FieldLabel required>Physical Address</FieldLabel>
               <input
                 type="text"
-                value={clientFacingName}
-                onChange={(e) => setClientFacingName(e.target.value)}
-                placeholder="Name shown to agents and clients"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="123 Main Street"
                 className={INPUT}
               />
             </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <FieldLabel required>City</FieldLabel>
+                <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Phoenix" className={INPUT} />
+              </div>
+              <div>
+                <FieldLabel required>State</FieldLabel>
+                <select value={state} onChange={(e) => setState(e.target.value)} className={INPUT}>
+                  <option value="">State</option>
+                  {US_STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel required>ZIP Code</FieldLabel>
+                <input type="text" value={zip} onChange={(e) => setZip(e.target.value)} placeholder="85001" className={INPUT} />
+              </div>
+              <div>
+                <FieldLabel required>Country</FieldLabel>
+                <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="United States" className={INPUT} />
+              </div>
+            </div>
+
             <div>
-              <label className={LABEL}>Time Zone</label>
+              <FieldLabel>Time Zone</FieldLabel>
               <select
                 value={timeZone}
                 onChange={(e) => setTimeZone(e.target.value)}
@@ -520,25 +526,34 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                 ))}
               </select>
             </div>
-          </div>
-        </div>
 
-        {/* Section 2 — Branding */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <SectionHeader n={2} title="Branding" />
-          <div className="space-y-4">
-            {/* Logo upload */}
             <div>
-              <label className={LABEL}>Company Logo</label>
+              <FieldLabel>Website (Optional)</FieldLabel>
+              <input
+                type="text"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                onBlur={() => validateUrl('website', website)}
+                placeholder="https://yourbrokerage.com"
+                className={urlInputClass('website')}
+              />
+              {urlErrors['website'] && (
+                <p className="mt-1 text-xs text-red-500">{urlErrors['website']}</p>
+              )}
+            </div>
+
+            <div>
+              <FieldLabel>Company Logo</FieldLabel>
               <input
                 ref={logoInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                accept="image/png,image/jpeg,image/svg+xml"
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoSelect(f); }}
               />
               {logoPreview ? (
                 <div className="relative flex items-center gap-4 rounded-lg border border-gray-200 px-4 py-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={logoPreview} alt="Logo preview" className="h-12 max-w-[120px] object-contain" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-700 truncate">{logoFile?.name}</p>
@@ -568,39 +583,54 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
                   onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleLogoSelect(f); }}
                 >
                   <Upload size={22} className="text-gray-300" />
-                  <p className="text-sm text-gray-500">Click or drag to upload logo</p>
-                  <p className="text-xs text-gray-400">PNG, JPG, SVG, WebP · Max 5 MB</p>
+                  <p className="text-sm text-gray-500">Click to upload or drag and drop</p>
+                  <p className="text-xs text-gray-400">PNG, JPG or SVG · max 5MB</p>
                 </div>
               )}
               {logoError && <p className="mt-1 text-xs text-red-500">{logoError}</p>}
             </div>
+          </div>
+        </div>
+
+        {/* Section 2 — Primary Point of Contact */}
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <SectionHeader n={2} title="Primary Point of Contact" />
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <ColorInput label="Primary Brand Color" value={primaryColor} onChange={setPrimaryColor} />
-              <ColorInput label="Secondary Brand Color" value={secondaryColor} onChange={setSecondaryColor} />
+              <div>
+                <FieldLabel locked>First Name</FieldLabel>
+                <input type="text" value={prefill.primaryContactFirstName} disabled className={INPUT} />
+              </div>
+              <div>
+                <FieldLabel locked>Last Name</FieldLabel>
+                <input type="text" value={prefill.primaryContactLastName} disabled className={INPUT} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel locked>Email</FieldLabel>
+                <input type="text" value={prefill.primaryContactEmail} disabled className={INPUT} />
+              </div>
+              <div>
+                <FieldLabel required>Phone</FieldLabel>
+                <input
+                  type="tel"
+                  value={primaryContactPhone}
+                  onChange={(e) => setPrimaryContactPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className={INPUT}
+                />
+              </div>
             </div>
             <div>
-              <label className={LABEL}>Physical Address</label>
+              <FieldLabel>Title (Optional)</FieldLabel>
               <input
                 type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="123 Main St, City, State ZIP"
+                value={primaryContactTitle}
+                onChange={(e) => setPrimaryContactTitle(e.target.value)}
+                placeholder="e.g. Managing Broker"
                 className={INPUT}
               />
-            </div>
-            <div>
-              <label className={LABEL}>Company Website</label>
-              <input
-                type="text"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                onBlur={() => validateUrl('website', website)}
-                placeholder="https://yourbrokerage.com"
-                className={urlInputClass('website')}
-              />
-              {urlErrors['website'] && (
-                <p className="mt-1 text-xs text-red-500">{urlErrors['website']}</p>
-              )}
             </div>
           </div>
         </div>
@@ -632,120 +662,6 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
             </button>
           </div>
         </div>
-
-        {/* Section 4 — Resources & Quick Links */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <SectionHeader
-            n={4}
-            title="Office Resources & Quick Links"
-            subtitle="Configure the default office resources available to agents."
-          />
-          <div className="space-y-4">
-            <div>
-              <label className={LABEL}>MLS Website</label>
-              <input
-                type="text"
-                value={mlsWebsite}
-                onChange={(e) => setMlsWebsite(e.target.value)}
-                onBlur={() => validateUrl('mlsWebsite', mlsWebsite)}
-                placeholder="https://mlslistings.com"
-                className={urlInputClass('mlsWebsite')}
-              />
-              {urlErrors['mlsWebsite'] && (
-                <p className="mt-1 text-xs text-red-500">{urlErrors['mlsWebsite']}</p>
-              )}
-            </div>
-            <div>
-              <label className={LABEL}>Board of Realtors Website</label>
-              <input
-                type="text"
-                value={boardOfRealtorsWebsite}
-                onChange={(e) => setBoardOfRealtorsWebsite(e.target.value)}
-                onBlur={() => validateUrl('boardOfRealtorsWebsite', boardOfRealtorsWebsite)}
-                placeholder="https://arizonarealtors.com"
-                className={urlInputClass('boardOfRealtorsWebsite')}
-              />
-              {urlErrors['boardOfRealtorsWebsite'] && (
-                <p className="mt-1 text-xs text-red-500">{urlErrors['boardOfRealtorsWebsite']}</p>
-              )}
-            </div>
-            <div>
-              <label className={LABEL}>Training Calendar Link</label>
-              <input
-                type="text"
-                value={trainingCalendarUrl}
-                onChange={(e) => setTrainingCalendarUrl(e.target.value)}
-                onBlur={() => validateUrl('trainingCalendarUrl', trainingCalendarUrl)}
-                placeholder="https://calendar.google.com/..."
-                className={urlInputClass('trainingCalendarUrl')}
-              />
-              {urlErrors['trainingCalendarUrl'] && (
-                <p className="mt-1 text-xs text-red-500">{urlErrors['trainingCalendarUrl']}</p>
-              )}
-            </div>
-            <div>
-              <label className={LABEL}>Google Drive Link</label>
-              <input
-                type="text"
-                value={googleDriveUrl}
-                onChange={(e) => setGoogleDriveUrl(e.target.value)}
-                onBlur={() => validateUrl('googleDriveUrl', googleDriveUrl)}
-                placeholder="https://drive.google.com/..."
-                className={urlInputClass('googleDriveUrl')}
-              />
-              {urlErrors['googleDriveUrl'] && (
-                <p className="mt-1 text-xs text-red-500">{urlErrors['googleDriveUrl']}</p>
-              )}
-            </div>
-            <div>
-              <label className={LABEL}>Additional Links</label>
-              <div className="space-y-2">
-                {additionalLinks.map((link, i) => {
-                  const urlKey = `additionalLink-${link._key}`;
-                  return (
-                    <div key={link._key}>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={link.label}
-                          onChange={(e) => updateLink(i, { label: e.target.value })}
-                          placeholder="Label"
-                          className={`${INPUT} flex-1`}
-                        />
-                        <input
-                          type="text"
-                          value={link.url}
-                          onChange={(e) => updateLink(i, { url: e.target.value })}
-                          onBlur={() => validateUrl(urlKey, link.url)}
-                          placeholder="https://"
-                          className={`${urlInputClass(urlKey)} flex-1`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeLink(i)}
-                          className="text-gray-400 hover:text-gray-600 shrink-0"
-                        >
-                          <X size={15} />
-                        </button>
-                      </div>
-                      {urlErrors[urlKey] && (
-                        <p className="mt-1 text-xs text-red-500 pl-[calc(50%+4px)]">{urlErrors[urlKey]}</p>
-                      )}
-                    </div>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={addLink}
-                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <Plus size={13} />
-                  Add Link
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Sticky footer */}
@@ -763,7 +679,7 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
               disabled={isSubmitting}
               className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
             >
-              Close
+              Cancel
             </button>
             <button
               type="button"
@@ -771,10 +687,10 @@ export default function WorkspaceSetupForm({ prefill, token }: { prefill: Prefil
               disabled={isSubmitting}
               className="px-5 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {isSubmitting ? 'Submitting…' : (
+              {isSubmitting ? 'Creating…' : (
                 <>
                   <CheckCircle size={14} />
-                  Submit
+                  Create Workspace
                 </>
               )}
             </button>

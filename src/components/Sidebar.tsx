@@ -5,8 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
-  FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
-  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp,
+  FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
+  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
   Settings2, BookMarked, PlugZap, ChevronDown, LogOut, type LucideIcon,
 } from 'lucide-react';
 import { navigation, type NavItem } from '@/lib/navigation';
@@ -16,8 +16,8 @@ type SidebarUser = { name: string; email: string; role?: string | null };
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
-  FileBarChart2, Users, ClipboardList, MessageSquare, FolderOpen,
-  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp,
+  FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
+  BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
   Settings2, BookMarked, PlugZap,
 };
 
@@ -41,7 +41,17 @@ function NavLink({ item }: { item: NavItem }) {
   );
 }
 
-export default function Sidebar({ user }: { user?: SidebarUser }) {
+type SidebarWorkspace = { name: string; type: 'office' | 'team' };
+
+export default function Sidebar({
+  user,
+  hasWorkspaceAccess = false,
+  workspace,
+}: {
+  user?: SidebarUser;
+  hasWorkspaceAccess?: boolean;
+  workspace?: SidebarWorkspace | null;
+}) {
   const router = useRouter();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
@@ -72,19 +82,25 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
   const displayName = user?.name?.trim() || user?.email || 'Account';
   const initial = displayName.charAt(0).toUpperCase();
+  const isPlatformAdmin = user?.role === 'master' || user?.role === 'admin';
 
   return (
     <aside className="w-56 bg-slate-900 h-screen flex flex-col flex-shrink-0 sticky top-0">
-      {/* Brand */}
+      {/* Brand — shows the caller's own workspace when they have one (Manager/
+          Leader/Agent); falls back to PCx Platform branding for master, who
+          has no personal workspace. */}
       <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-slate-800">
         <div className="w-7 h-7 bg-red-500 rounded flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
           P
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-white text-sm font-semibold leading-tight">PCx Platform</div>
-          <div className="text-slate-500 text-xs leading-tight">Platform</div>
+          <div className="text-white text-sm font-semibold leading-tight truncate">
+            {workspace?.name || 'PCx Platform'}
+          </div>
+          <div className="text-slate-500 text-xs leading-tight">
+            {workspace ? (workspace.type === 'office' ? 'Office' : 'Team') : 'Platform'}
+          </div>
         </div>
-        <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
       </div>
 
       {/* Navigation */}
@@ -95,15 +111,21 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
               !group.requiredRoles ||
               (!!user?.role && group.requiredRoles.includes(user.role)),
           )
+          .filter((group) => !group.requiresWorkspaceAccess || hasWorkspaceAccess)
           .map((group) => (
             <div key={group.section}>
               <div className="px-5 mb-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
                 {group.section}
               </div>
               <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <NavLink key={item.href} item={item} />
-                ))}
+                {group.items
+                  .filter(
+                    (item) =>
+                      !item.hiddenFromAgent || isPlatformAdmin || hasWorkspaceAccess,
+                  )
+                  .map((item) => (
+                    <NavLink key={item.href} item={item} />
+                  ))}
               </div>
             </div>
           ))}

@@ -148,7 +148,7 @@ export default function UsersTable({ items, onDeleteClick }: UsersTableProps) {
               cls: 'bg-gray-100 text-gray-500',
             };
             return (
-              <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={`${u.id}-${u.workspaceId ?? 'none'}`} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3.5">
                   <input type="checkbox" className="accent-teal-600 w-3.5 h-3.5" aria-label={`Select ${u.name}`} />
                 </td>
