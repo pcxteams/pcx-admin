@@ -55,14 +55,88 @@ export const LEADER_ACTION_LABEL: Record<string, string> = {
   reject: 'Reject',
 };
 
-/** Video is upload-only (never an external embed URL). */
+export const VIDEO_EMBED_PROVIDERS = ['youtube', 'vimeo'] as const;
+export type VideoEmbedProvider = (typeof VIDEO_EMBED_PROVIDERS)[number];
+
+/** Video is either a private S3 upload (default) or a YouTube/Vimeo embed. */
 export interface VideoConfig {
+  source?: 'upload' | 'embed';
+  // upload
   fileKey?: string;
   fileName?: string;
   mimeType?: string;
   fileSizeBytes?: number;
   /** Duration in seconds, auto-detected from the file on upload. */
   durationSeconds?: number;
+  // embed
+  url?: string;
+  provider?: VideoEmbedProvider;
+  embedId?: string;
+}
+
+export interface ParsedVideoEmbed {
+  provider: VideoEmbedProvider;
+  embedId: string;
+}
+
+/**
+ * Recognizes a YouTube or Vimeo watch/share/embed URL and extracts the
+ * provider + video id. Mirrors the server-side parser in
+ * pcx-api-v2-new/src/content/types/content.ts so the client can reject a bad
+ * link before ever calling the API.
+ */
+export function parseVideoEmbedUrl(raw: string): ParsedVideoEmbed | null {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+  const host = url.hostname.toLowerCase().replace(/^(www\.|m\.)/, '');
+  const segments = url.pathname.split('/').filter(Boolean);
+
+  if (host === 'youtu.be') {
+    const id = segments[0];
+    return isYoutubeId(id) ? { provider: 'youtube', embedId: id } : null;
+  }
+  if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    if (url.pathname === '/watch') {
+      const id = url.searchParams.get('v');
+      return id && isYoutubeId(id)
+        ? { provider: 'youtube', embedId: id }
+        : null;
+    }
+    if (
+      segments.length >= 2 &&
+      ['embed', 'shorts', 'live'].includes(segments[0]) &&
+      isYoutubeId(segments[1])
+    ) {
+      return { provider: 'youtube', embedId: segments[1] };
+    }
+    return null;
+  }
+  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+    const id = [...segments].reverse().find((s) => /^\d+$/.test(s));
+    return id ? { provider: 'vimeo', embedId: id } : null;
+  }
+  return null;
+}
+
+function isYoutubeId(id: string | undefined): id is string {
+  return typeof id === 'string' && /^[\w-]{10,12}$/.test(id);
+}
+
+/** Restricted embed src: no related-video rail, no branding chrome. */
+export function buildVideoEmbedSrc(
+  provider: VideoEmbedProvider,
+  embedId: string,
+): string {
+  if (provider === 'youtube') {
+    return `https://www.youtube-nocookie.com/embed/${embedId}?rel=0&modestbranding=1&iv_load_policy=3`;
+  }
+  return `https://player.vimeo.com/video/${embedId}?title=0&byline=0&portrait=0`;
 }
 export interface ResourceConfig {
   fileKey: string;
