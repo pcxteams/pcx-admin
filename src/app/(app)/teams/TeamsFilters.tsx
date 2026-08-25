@@ -13,6 +13,9 @@ const PLAN_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
+  { value: 'setup_pending', label: 'Pending' },
+  { value: 'setup_sent', label: 'Sent' },
+  { value: 'setup_viewed', label: 'Viewed' },
   { value: 'active', label: 'Active' },
   { value: 'archived', label: 'Archived' },
 ];
