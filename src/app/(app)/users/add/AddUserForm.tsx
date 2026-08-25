@@ -12,11 +12,11 @@ import {
   type MyWorkspaceScope,
   type WorkspaceOption,
 } from '@/lib/workspaces';
-import { createInvitedUser, type CreateUserRole, type ProductionLevelInput } from '@/lib/users';
+import { createInvitedUser, type CreateUserRole, type OnboardingTypeInput } from '@/lib/users';
 import ProfilePhotoUpload from './ProfilePhotoUpload';
 import AssignedLeaderFields, { type LeaderValue } from './AssignedLeaderFields';
 import VisibilityFields, { type AccessLevel } from './VisibilityFields';
-import ProductionLevelFields from './ProductionLevelFields';
+import OnboardingTypeFields from './OnboardingTypeFields';
 
 const INPUT_CLASS =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent';
@@ -80,8 +80,8 @@ export default function AddUserForm() {
   // 4. Visibility (leader only)
   const [accessLevel, setAccessLevel] = useState<AccessLevel>('workspace');
 
-  // 5. Production Information (agent only)
-  const [productionLevel, setProductionLevel] = useState<ProductionLevelInput | ''>('');
+  // 4. Onboarding Type (agent only)
+  const [onboardingType, setOnboardingType] = useState<OnboardingTypeInput | ''>('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -190,7 +190,7 @@ export default function AddUserForm() {
     lastName.trim() !== '' &&
     email.trim() !== '' &&
     primaryWorkspaceId !== '' &&
-    (role !== 'agent' || (primaryLeader.id !== '' && productionLevel !== ''));
+    (role !== 'agent' || (primaryLeader.id !== '' && onboardingType !== ''));
 
   async function handleSubmit() {
     if (!canSubmit || isSubmitting) return;
@@ -207,7 +207,7 @@ export default function AddUserForm() {
       teamId: role === 'agent' && teamId ? teamId : undefined,
       primaryLeaderId: role === 'agent' ? primaryLeader.id : undefined,
       additionalLeaderIds: role === 'agent' ? additionalLeaders.map((l) => l.id).filter(Boolean) : undefined,
-      productionLevel: role === 'agent' && productionLevel ? productionLevel : undefined,
+      onboardingType: role === 'agent' && onboardingType ? onboardingType : undefined,
       visibilityScope: role === 'leader' ? accessLevel : undefined,
       additionalWorkspaceIds:
         role === 'leader' || role === 'manager'
@@ -396,7 +396,7 @@ export default function AddUserForm() {
       {role === 'leader' && <VisibilityFields accessLevel={accessLevel} onAccessLevelChange={setAccessLevel} />}
 
       {role === 'agent' && (
-        <ProductionLevelFields value={productionLevel} onChange={(v) => setProductionLevel(v as ProductionLevelInput)} />
+        <OnboardingTypeFields value={onboardingType} onChange={(v) => setOnboardingType(v as OnboardingTypeInput)} />
       )}
 
       {submitError && (

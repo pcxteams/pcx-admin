@@ -49,7 +49,14 @@ export async function fetchLeaderOptions(workspaceId: string, query: string): Pr
 
 export type CreateUserRole = 'agent' | 'manager' | 'leader';
 export type VisibilityScopeInput = 'workspace' | 'assigned_agents';
-export type ProductionLevelInput = 'no_production' | 'some_production' | 'consistent_producer';
+// KAN-96 (Aug 18 clarification): one combined Onboarding Type replaces the old
+// Production Level. It drives both the Office Setup audience and the starting
+// learning path (New Agent + Transfer/Some -> Foundations; Transfer/Highly ->
+// Mastery); the server derives and persists the path (see users.service.ts).
+export type OnboardingTypeInput =
+  | 'new_agent'
+  | 'transfer_some_experience'
+  | 'transfer_highly_experienced';
 
 export interface CreateInvitedUserPayload {
   role: CreateUserRole;
@@ -61,7 +68,7 @@ export interface CreateInvitedUserPayload {
   teamId?: string;
   primaryLeaderId?: string;
   additionalLeaderIds?: string[];
-  productionLevel?: ProductionLevelInput;
+  onboardingType?: OnboardingTypeInput;
   visibilityScope?: VisibilityScopeInput;
   additionalWorkspaceIds?: string[];
   sendWelcomeEmail?: boolean;
