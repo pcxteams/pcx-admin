@@ -3,7 +3,18 @@ import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 import AddUserForm from './AddUserForm';
 
-export default async function AddUserPage() {
+export default async function AddUserPage({
+  searchParams,
+}: {
+  // KAN-115: the Team Profile page's "Add Member" button links here with
+  // the Team's Workspace + Team preselected.
+  searchParams: Promise<{
+    workspaceId?: string;
+    workspaceLabel?: string;
+    teamId?: string;
+    teamLabel?: string;
+  }>;
+}) {
   const session = await getSession();
   if (!session) redirect('/login');
 
@@ -21,9 +32,16 @@ export default async function AddUserPage() {
     );
   }
 
+  const { workspaceId, workspaceLabel, teamId, teamLabel } = await searchParams;
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <AddUserForm />
+      <AddUserForm
+        initialWorkspaceId={workspaceId}
+        initialWorkspaceLabel={workspaceLabel}
+        initialTeamId={teamId}
+        initialTeamLabel={teamLabel}
+      />
     </div>
   );
 }
