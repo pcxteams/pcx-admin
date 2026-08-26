@@ -46,7 +46,20 @@ const ROLES: { value: CreateUserRole; label: string }[] = [
  * workspace_membership per selected workspace, same role/visibility as
  * the Primary Workspace membership.
  */
-export default function AddUserForm() {
+interface AddUserFormProps {
+  /** KAN-115: preselection from the Team Profile page's "Add Member" button. */
+  initialWorkspaceId?: string;
+  initialWorkspaceLabel?: string;
+  initialTeamId?: string;
+  initialTeamLabel?: string;
+}
+
+export default function AddUserForm({
+  initialWorkspaceId,
+  initialWorkspaceLabel,
+  initialTeamId,
+  initialTeamLabel,
+}: AddUserFormProps = {}) {
   const router = useRouter();
   const [role, setRole] = useState<CreateUserRole>('agent');
 
@@ -59,18 +72,25 @@ export default function AddUserForm() {
 
   // 3. Workspace Assignment
   const [myScope, setMyScope] = useState<MyWorkspaceScope | null>(null);
-  const [primaryWorkspaceId, setPrimaryWorkspaceId] = useState('');
-  const [primaryWorkspaceLabel, setPrimaryWorkspaceLabel] = useState('');
+  const [primaryWorkspaceId, setPrimaryWorkspaceId] = useState(initialWorkspaceId ?? '');
+  const [primaryWorkspaceLabel, setPrimaryWorkspaceLabel] = useState(initialWorkspaceLabel ?? '');
   // A Team can never itself be the parent of another Team (hierarchy is
   // Office -> Team, one level, per the Foundational Architecture doc) — the
   // Team field only ever makes sense when the Primary Workspace is an
   // Office. Populated via workspaceTypeCache below, since neither
   // AsyncSearchableSelect's onChange nor the myScope options carry type
-  // through to this handler directly.
-  const [primaryWorkspaceType, setPrimaryWorkspaceType] = useState<'office' | 'team' | null>(null);
-  const workspaceTypeCache = useRef<Map<string, 'office' | 'team'>>(new Map());
-  const [teamId, setTeamId] = useState('');
-  const [teamLabel, setTeamLabel] = useState('');
+  // through to this handler directly. A preselected initialWorkspaceId
+  // always comes from a Team Profile's "Add Member" link (KAN-115), whose
+  // Workspace is always the Team's Parent Office, so it's seeded as 'office'
+  // up front rather than left to resolve from a later search.
+  const [primaryWorkspaceType, setPrimaryWorkspaceType] = useState<'office' | 'team' | null>(
+    initialWorkspaceId ? 'office' : null,
+  );
+  const workspaceTypeCache = useRef<Map<string, 'office' | 'team'>>(
+    new Map(initialWorkspaceId ? [[initialWorkspaceId, 'office' as const]] : []),
+  );
+  const [teamId, setTeamId] = useState(initialTeamId ?? '');
+  const [teamLabel, setTeamLabel] = useState(initialTeamLabel ?? '');
   const [additionalWorkspaces, setAdditionalWorkspaces] = useState<LeaderValue[]>([]);
 
   // 4. Assigned Leader (agent only)
@@ -202,6 +222,15 @@ export default function AddUserForm() {
 
   const leaderScopeWorkspaceId = teamId || primaryWorkspaceId;
 
+  // KAN-115: arriving here from a Team Profile's "Add Member" button should
+  // return there — both the back link and the post-submit redirect — rather
+  // than stranding the caller on the generic Users list they didn't come
+  // from. Keyed off initialTeamId (not the possibly-since-changed teamId
+  // state) so it stays fixed to where this page was actually opened from.
+  const returnTo = initialTeamId
+    ? { href: `/teams/${initialTeamId}`, label: initialTeamLabel || 'Team' }
+    : { href: '/users', label: 'Users' };
+
   const canSubmit =
     firstName.trim() !== '' &&
     lastName.trim() !== '' &&
@@ -239,15 +268,15 @@ export default function AddUserForm() {
       return;
     }
 
-    router.push('/users');
+    router.push(returnTo.href);
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/users" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+        <Link href={returnTo.href} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft size={14} />
-          Back to Users
+          Back to {returnTo.label}
         </Link>
         <h1 className="text-2xl font-semibold text-gray-900 mt-3">Add New User</h1>
       </div>
