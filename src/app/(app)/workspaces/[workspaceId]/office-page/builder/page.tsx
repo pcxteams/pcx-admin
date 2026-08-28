@@ -17,8 +17,15 @@ export default async function BuilderPage({
     `/workspaces/${workspaceId}/office-page`,
   );
 
-  // No data (no access / not found) or view-only → fall back to the read view.
-  if (!data || !data.access.canEdit) {
+  // Fall back to the read view when there's no access, when the page is
+  // view-only, or when the content is inherited from a Parent Office (a Free
+  // Team). Inherited content is editable only through the Parent Office, so no
+  // role opens the builder here, keeping the UI consistent with the API.
+  if (
+    !data ||
+    !data.access.canEdit ||
+    data.owningWorkspaceId !== data.workspaceId
+  ) {
     redirect(`/workspaces/${workspaceId}/office-page`);
   }
 

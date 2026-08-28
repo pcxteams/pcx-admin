@@ -274,6 +274,13 @@ export interface WorkspaceAccess {
 export interface OfficePageBuilderResponse {
   pageId: string;
   workspaceId: string;
+  /** The workspace that actually owns this page. Differs from `workspaceId`
+   * only when the content is inherited (a Free Team inheriting from its
+   * Parent Office). */
+  owningWorkspaceId: string;
+  /** Display name of the owning Parent Office; null unless the content is
+   * inherited. */
+  owningWorkspaceName: string | null;
   pageStatus: 'draft' | 'published' | 'archived';
   content: OfficePageContent;
   lastPublishedAt: string | null;
@@ -288,7 +295,12 @@ export interface OfficePageBuilderResponse {
  */
 export interface OfficePagePublishedResponse {
   workspaceId: string;
+  /** The workspace that owns the published content. For a Free Team this is its
+   * Parent Office and differs from `workspaceId` (content is inherited). */
   owningWorkspaceId: string;
+  /** Display name of the owning Parent Office; null unless inherited. Drives the
+   * read-only "provided by your Parent Office" banner. */
+  owningWorkspaceName: string | null;
   pageStatus: 'draft' | 'published' | 'archived' | null;
   content: OfficePageContent | null;
   access: WorkspaceAccess;

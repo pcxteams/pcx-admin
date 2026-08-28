@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Lock, PencilLine } from 'lucide-react';
+import { ArrowLeft, Building2, Lock, PencilLine } from 'lucide-react';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
 import type { OfficePagePublishedResponse } from '@/lib/office-page-content';
@@ -44,6 +44,13 @@ export default async function OfficePagePage({
   ]);
   const activeVendors = vendorData?.vendors ?? [];
 
+  // A Free Team's Agent Office is inherited from, and editable only through, its
+  // Parent Office. Treat it as read-only here for everyone (platform admins
+  // included) so the edit affordance never contradicts the read-only banner;
+  // the write is refused by the API regardless.
+  const isInherited = !!data && data.owningWorkspaceId !== data.workspaceId;
+  const canEditHere = !!data && data.access.canEdit && !isInherited;
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <Link
@@ -68,7 +75,7 @@ export default async function OfficePagePage({
               <h1 className="text-xl font-semibold text-gray-900">Agent Office</h1>
               <div className="flex items-center gap-2 mt-2">
                 <StatusBadge status={data.pageStatus} />
-                {!data.access.canEdit && (
+                {!canEditHere && (
                   <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                     <Lock size={11} />
                     View only
@@ -76,7 +83,7 @@ export default async function OfficePagePage({
                 )}
               </div>
             </div>
-            {data.access.canEdit && (
+            {canEditHere && (
               <Link
                 href={`/workspaces/${workspaceId}/office-page/builder`}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600 text-white text-xs font-medium hover:bg-teal-700 transition-colors"
@@ -87,6 +94,22 @@ export default async function OfficePagePage({
             )}
           </div>
 
+          {/* Inherited content: for a Free Team the owning workspace is its
+              Parent Office and differs from the one being viewed. */}
+          {isInherited && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3.5 mb-8">
+              <Building2 size={16} aria-hidden className="text-blue-500 mt-0.5 shrink-0" />
+              <p className="text-sm text-blue-800">
+                This Agent Office content is provided by{' '}
+                <span className="font-medium">
+                  {data.owningWorkspaceName ?? 'your Parent Office'}
+                </span>{' '}
+                and is read-only. You can view and search it, but its content is
+                managed by the Parent Office.
+              </p>
+            </div>
+          )}
+
           {data.content || activeVendors.length > 0 ? (
             // Vendors publish immediately on form submission (KAN-99), independent
             // of the builder's own publish step — shown even if the rest of the
@@ -96,7 +119,7 @@ export default async function OfficePagePage({
             <div className="rounded-xl border border-gray-100 bg-white px-6 py-16 text-center">
               <p className="text-sm text-gray-500">
                 This office page hasn&apos;t been published yet.
-                {data.access.canEdit
+                {canEditHere
                   ? ' Open the builder to make changes and publish it.'
                   : ' Check back once a manager publishes it.'}
               </p>
