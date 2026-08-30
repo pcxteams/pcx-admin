@@ -45,6 +45,41 @@ export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
 export type ContentSort = 'recently_updated' | 'recently_created' | 'title';
 
+/**
+ * Career Builder AI tag dimensions confirmed by product 2026-08-28/29.
+ * Mirrors pcx-api-v2-new's src/content/types/content.ts — keep in sync.
+ * Distinct from `status` above (publish state) and `category` above (topic).
+ */
+export const CONTENT_PRIORITIES = [
+  { value: 'critical', label: 'Critical' },
+  { value: 'very_important', label: 'Very Important' },
+  { value: 'important', label: 'Important' },
+] as const;
+export type ContentPriority = (typeof CONTENT_PRIORITIES)[number]['value'];
+
+/** Same three values as workspace_membership.onboarding_type — no mapping table. */
+export const AGENT_LEVELS = [
+  { value: 'new_agent', label: 'New Agent' },
+  { value: 'transfer_some_experience', label: 'Producer' },
+  { value: 'transfer_highly_experienced', label: 'Top Producer' },
+] as const;
+export type AgentLevel = (typeof AGENT_LEVELS)[number]['value'];
+
+export const CONTENT_PURPOSES = [
+  { value: 'learn', label: 'Learn' },
+  { value: 'plan', label: 'Plan' },
+  { value: 'do', label: 'Do' },
+  { value: 'reference', label: 'Reference' },
+] as const;
+export type ContentPurpose = (typeof CONTENT_PURPOSES)[number]['value'];
+
+export const ASSIGNMENT_STATUSES = [
+  { value: 'required', label: 'Required' },
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'optional', label: 'Optional' },
+] as const;
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number]['value'];
+
 /** Accepted upload MIME types, kept in sync with the API allowlists. */
 export const RESOURCE_ACCEPT =
   '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp';
@@ -189,6 +224,10 @@ export interface ContentItemSummary {
   category: string | null;
   tags: string[];
   status: ContentStatus;
+  priority: ContentPriority | null;
+  agentLevels: AgentLevel[];
+  purpose: ContentPurpose | null;
+  assignmentStatus: AssignmentStatus | null;
   estTime: string | null;
   config: ContentConfig;
   usedInCount: number;
