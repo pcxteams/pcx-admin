@@ -16,15 +16,30 @@ export type ContentType = (typeof CONTENT_TYPES)[number];
 export const CONTENT_STATUSES = ['active', 'draft', 'archive'] as const;
 export type ContentStatus = (typeof CONTENT_STATUSES)[number];
 
-/** Fixed MVP category list (open-question #2, admin-managed later). */
+/**
+ * Category taxonomy confirmed by product 2026-08-28/29 for the Career Builder
+ * AI pivot, replacing the original 7-item MVP placeholder (open-question #2).
+ * Mirrors pcx-api-v2-new's src/content/types/content.ts — keep in sync.
+ */
 export const CONTENT_CATEGORIES = [
-  'Buyer',
-  'Listing',
-  'CRM',
+  'Onboarding',
+  'Business Planning',
+  'Mindset & Personal Performance',
   'Lead Generation',
-  'Marketing',
+  'Buyers',
+  'Sellers',
+  'CRM',
+  'MLS',
   'Contracts',
-  'Leadership',
+  'Negotiation',
+  'Client Management',
+  'Systems + Automation',
+  'Transaction Management',
+  'Financial & Wealth Building',
+  'Tax Planning',
+  'Team Building',
+  'Leadership Development',
+  'AI and Technology',
 ] as const;
 export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
