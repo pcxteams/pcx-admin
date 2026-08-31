@@ -12,6 +12,13 @@ export type NavItem = {
    * workspace members.
    */
   hiddenFromAgent?: boolean;
+  /**
+   * Item-level platform-role gate, for when a section is shared by several
+   * platform roles but a single entry is narrower. e.g. PCX PLATFORM is shown
+   * to master + admin (PCx Admin), but Workspaces stays master-only while
+   * Settings is open to both. Omit to inherit the section's visibility.
+   */
+  requiredRoles?: string[];
 };
 
 export type NavSection = {
@@ -32,9 +39,11 @@ export type NavSection = {
 export const navigation: NavSection[] = [
   {
     section: 'PCX PLATFORM',
-    requiredRoles: ['master'],
+    requiredRoles: ['master', 'admin'],
     items: [
-      { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid' },
+      // Workspace management stays master-only (see workspaces/page.tsx); PCx
+      // Admins get Platform Settings but not the Workspaces admin surface.
+      { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid', requiredRoles: ['master'] },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
     ],
   },
