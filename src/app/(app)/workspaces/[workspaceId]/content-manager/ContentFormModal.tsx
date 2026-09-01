@@ -5,10 +5,12 @@ import { X, Upload, Loader2, FileText } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, TYPE_META, RESOURCE_ACCEPT, VIDEO_ACCEPT,
   LEADER_VERIFICATION_TYPES, formatDuration, parseVideoEmbedUrl,
+  CONTENT_PRIORITIES, AGENT_LEVELS, CONTENT_PURPOSES, ASSIGNMENT_STATUSES,
   type ContentType, type ContentStatus, type ContentItemDetail,
   type ContentItemSummary, type ContentListResponse, type RelatedContentRef,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig,
-  type LeaderVerificationConfig,
+  type LeaderVerificationConfig, type ContentPriority, type AgentLevel,
+  type ContentPurpose, type AssignmentStatus,
 } from '@/lib/content';
 import { TypeIcon } from './content-icons';
 
@@ -62,6 +64,21 @@ export default function ContentFormModal({
   const [tagInput, setTagInput] = useState('');
   const [status, setStatus] = useState<ContentStatus>(item?.status ?? 'draft');
   const [estTime, setEstTime] = useState(item?.estTime ?? '');
+
+  // Career Builder AI tag dimensions — see career-builder.validator.ts on the
+  // API side for why these are separate from category/status above.
+  const [priority, setPriority] = useState<ContentPriority | ''>(item?.priority ?? '');
+  const [agentLevels, setAgentLevels] = useState<AgentLevel[]>(item?.agentLevels ?? []);
+  const [purpose, setPurpose] = useState<ContentPurpose | ''>(item?.purpose ?? '');
+  const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus | ''>(
+    item?.assignmentStatus ?? '',
+  );
+
+  function toggleAgentLevel(level: AgentLevel) {
+    setAgentLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level],
+    );
+  }
 
   const [linkUrl, setLinkUrl] = useState((item?.config as ExternalLinkConfig)?.url ?? '');
 
@@ -253,6 +270,10 @@ export default function ContentFormModal({
         config,
         estTime: estTime.trim() || null,
         relatedContentIds: relatedIds,
+        priority: priority || null,
+        agentLevels,
+        purpose: purpose || null,
+        assignmentStatus: assignmentStatus || null,
       };
       if (mode === 'create') payload.type = type;
 
@@ -458,6 +479,73 @@ export default function ContentFormModal({
                 <option value="active">Active</option>
                 <option value="archive">Archived</option>
               </select>
+            </div>
+          </div>
+
+          {/* Career Builder AI tagging */}
+          <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3.5 space-y-3.5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              AI Ranking Tags
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={LABEL}>Priority</label>
+                <select
+                  className={INPUT}
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as ContentPriority | '')}
+                >
+                  <option value="">None</option>
+                  {CONTENT_PRIORITIES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={LABEL}>Assignment Status</label>
+                <select
+                  className={INPUT}
+                  value={assignmentStatus}
+                  onChange={(e) => setAssignmentStatus(e.target.value as AssignmentStatus | '')}
+                >
+                  <option value="">None</option>
+                  {ASSIGNMENT_STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={LABEL}>Purpose</label>
+              <select
+                className={INPUT}
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value as ContentPurpose | '')}
+              >
+                <option value="">None</option>
+                {CONTENT_PURPOSES.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>Agent Level</label>
+              <div className="flex flex-wrap gap-3">
+                {AGENT_LEVELS.map((l) => (
+                  <label key={l.value} className="inline-flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={agentLevels.includes(l.value)}
+                      onChange={() => toggleAgentLevel(l.value)}
+                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                    {l.label}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Which agent tiers this applies to. Leave all unchecked and this item is never surfaced by the ranking engine.
+              </p>
             </div>
           </div>
 

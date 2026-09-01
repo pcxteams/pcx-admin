@@ -16,19 +16,69 @@ export type ContentType = (typeof CONTENT_TYPES)[number];
 export const CONTENT_STATUSES = ['active', 'draft', 'archive'] as const;
 export type ContentStatus = (typeof CONTENT_STATUSES)[number];
 
-/** Fixed MVP category list (open-question #2, admin-managed later). */
+/**
+ * Category taxonomy confirmed by product 2026-08-28/29 for the Career Builder
+ * AI pivot, replacing the original 7-item MVP placeholder (open-question #2).
+ * Mirrors pcx-api-v2-new's src/content/types/content.ts — keep in sync.
+ */
 export const CONTENT_CATEGORIES = [
-  'Buyer',
-  'Listing',
-  'CRM',
+  'Onboarding',
+  'Business Planning',
+  'Mindset & Personal Performance',
   'Lead Generation',
-  'Marketing',
+  'Buyers',
+  'Sellers',
+  'CRM',
+  'MLS',
   'Contracts',
-  'Leadership',
+  'Negotiation',
+  'Client Management',
+  'Systems + Automation',
+  'Transaction Management',
+  'Financial & Wealth Building',
+  'Tax Planning',
+  'Team Building',
+  'Leadership Development',
+  'AI and Technology',
 ] as const;
 export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
 export type ContentSort = 'recently_updated' | 'recently_created' | 'title';
+
+/**
+ * Career Builder AI tag dimensions confirmed by product 2026-08-28/29.
+ * Mirrors pcx-api-v2-new's src/content/types/content.ts — keep in sync.
+ * Distinct from `status` above (publish state) and `category` above (topic).
+ */
+export const CONTENT_PRIORITIES = [
+  { value: 'critical', label: 'Critical' },
+  { value: 'very_important', label: 'Very Important' },
+  { value: 'important', label: 'Important' },
+] as const;
+export type ContentPriority = (typeof CONTENT_PRIORITIES)[number]['value'];
+
+/** Same three values as workspace_membership.onboarding_type — no mapping table. */
+export const AGENT_LEVELS = [
+  { value: 'new_agent', label: 'New Agent' },
+  { value: 'transfer_some_experience', label: 'Producer' },
+  { value: 'transfer_highly_experienced', label: 'Top Producer' },
+] as const;
+export type AgentLevel = (typeof AGENT_LEVELS)[number]['value'];
+
+export const CONTENT_PURPOSES = [
+  { value: 'learn', label: 'Learn' },
+  { value: 'plan', label: 'Plan' },
+  { value: 'do', label: 'Do' },
+  { value: 'reference', label: 'Reference' },
+] as const;
+export type ContentPurpose = (typeof CONTENT_PURPOSES)[number]['value'];
+
+export const ASSIGNMENT_STATUSES = [
+  { value: 'required', label: 'Required' },
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'optional', label: 'Optional' },
+] as const;
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number]['value'];
 
 /** Accepted upload MIME types, kept in sync with the API allowlists. */
 export const RESOURCE_ACCEPT =
@@ -174,6 +224,10 @@ export interface ContentItemSummary {
   category: string | null;
   tags: string[];
   status: ContentStatus;
+  priority: ContentPriority | null;
+  agentLevels: AgentLevel[];
+  purpose: ContentPurpose | null;
+  assignmentStatus: AssignmentStatus | null;
   estTime: string | null;
   config: ContentConfig;
   usedInCount: number;

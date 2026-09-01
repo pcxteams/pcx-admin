@@ -14,15 +14,44 @@ interface WorkspacesData {
   active: ActiveWorkspace[];
 }
 
+interface MyWorkspaceProfile {
+  id: string;
+}
+
 /**
  * The sidebar "Content Manager" item is a global entry point, but content is
- * workspace-scoped (KAN-90). This lightweight picker lists workspaces and links
- * into each one's Content Manager. Resolving a non-admin member straight to
- * their own workspace is a small follow-up (needs a "my workspaces" endpoint).
+ * workspace-scoped (KAN-90). Master/admin manage many workspaces, so they get
+ * a picker (GET /workspaces, platform-admin-only by design). A Manager/Leader
+ * only ever has one workspace, so they're resolved straight into it via
+ * GET /workspaces/me instead — that endpoint didn't exist yet when this page
+ * was first written; calling the master-only list for every caller regardless
+ * of role was the bug (a Manager/Leader always saw an empty picker pointing at
+ * a Workspaces page they also can't access).
  */
 export default async function ContentManagerPickerPage() {
   const session = await getSession();
   if (!session) redirect('/login');
+
+  const isPlatformAdmin = session.user.role === 'master' || session.user.role === 'admin';
+
+  if (!isPlatformAdmin) {
+    const myWorkspace = await apiGet<MyWorkspaceProfile | null>('/workspaces/me');
+    if (myWorkspace?.id) {
+      redirect(`/workspaces/${myWorkspace.id}/content-manager`);
+    }
+
+    return (
+      <div className="p-8 max-w-3xl mx-auto">
+        <div className="rounded-xl border border-gray-100 bg-white px-6 py-16 text-center">
+          <FolderOpen size={22} className="mx-auto text-gray-300" />
+          <p className="mt-3 text-sm text-gray-500">
+            No workspace found for your account. Contact your administrator if you believe this
+            is a mistake.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const data = await apiGet<WorkspacesData>('/workspaces');
   const workspaces = data?.active ?? [];
