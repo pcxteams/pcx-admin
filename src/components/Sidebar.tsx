@@ -123,6 +123,11 @@ export default function Sidebar({
                     (item) =>
                       !item.hiddenFromAgent || isPlatformAdmin || hasWorkspaceAccess,
                   )
+                  .filter(
+                    (item) =>
+                      !item.requiredRoles ||
+                      (!!user?.role && item.requiredRoles.includes(user.role)),
+                  )
                   .map((item) => (
                     <NavLink key={item.href} item={item} />
                   ))}
