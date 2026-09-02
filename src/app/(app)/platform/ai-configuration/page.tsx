@@ -1,12 +1,12 @@
 import WeightPanel from './WeightPanel';
+import PromptPanel from './PromptPanel';
 
 /**
  * PCx Platform > AI Configuration — home for platform-wide AI behavior
- * settings (master-only). Currently just the Career Builder ranking weights;
- * moved here (from /development/career-builder) as the first section of a
- * broader area that will grow to include things like the LLM prompt used for
- * "why" explanations and model choice, so those can be tuned without an
- * engineer redeploying.
+ * settings (master-only). Started with just the Career Builder ranking
+ * weights (moved here from /development/career-builder); now also the LLM
+ * prompt behind the "why" explanations, externalized so either can be tuned
+ * without an engineer redeploying. Will grow further (e.g. model choice).
  */
 export default function AiConfigurationPage() {
   return (
@@ -21,6 +21,12 @@ export default function AiConfigurationPage() {
         Tune the weights the Career Builder ranking engine uses to order content for agents.
       </p>
       <WeightPanel />
+
+      <h2 className="mt-10 text-sm font-semibold text-gray-900">"Why" explanation prompt</h2>
+      <p className="mt-1 mb-4 text-sm text-gray-500">
+        Tune the prompt the AI uses to explain why each item is recommended to an agent.
+      </p>
+      <PromptPanel />
     </div>
   );
 }
