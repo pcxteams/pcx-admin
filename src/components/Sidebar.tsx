@@ -24,7 +24,13 @@ const iconMap: Record<string, LucideIcon> = {
 function NavLink({ item }: { item: NavItem }) {
   const pathname = usePathname();
   const Icon = iconMap[item.icon];
-  const isActive = pathname === item.href;
+  // Prefix match (not just exact) so an item whose page has its own
+  // sub-routes/tabs (e.g. AI Configuration's Ranking Weights/Prompts tabs)
+  // stays highlighted while on any of them. '/' is excluded from prefix
+  // matching or it would match every route.
+  const isActive =
+    pathname === item.href ||
+    (item.href !== '/' && !!pathname?.startsWith(`${item.href}/`));
 
   return (
     <Link
