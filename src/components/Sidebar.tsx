@@ -7,7 +7,7 @@ import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
   BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
-  Settings2, BookMarked, PlugZap, ChevronDown, LogOut, type LucideIcon,
+  Settings2, BookMarked, PlugZap, Sparkles, ChevronDown, LogOut, type LucideIcon,
 } from 'lucide-react';
 import { navigation, type NavItem } from '@/lib/navigation';
 import { authClient } from '@/lib/auth-client';
@@ -18,7 +18,7 @@ const iconMap: Record<string, LucideIcon> = {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
   BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
-  Settings2, BookMarked, PlugZap,
+  Settings2, BookMarked, PlugZap, Sparkles,
 };
 
 function NavLink({ item }: { item: NavItem }) {

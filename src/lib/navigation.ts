@@ -45,6 +45,7 @@ export const navigation: NavSection[] = [
       // Admins get Platform Settings but not the Workspaces admin surface.
       { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid', requiredRoles: ['master'] },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
+      { label: 'AI Configuration', href: '/platform/ai-configuration', icon: 'Sparkles', requiredRoles: ['master'] },
     ],
   },
   {
@@ -74,7 +75,6 @@ export const navigation: NavSection[] = [
     section: 'DEVELOPMENT',
     items: [
       { label: 'Content Manager', href: '/development/content-manager', icon: 'FolderOpen' },
-      { label: 'Career Builder', href: '/development/career-builder', icon: 'Trophy' },
       { label: 'Calendar', href: '/development/calendar', icon: 'Calendar' },
     ],
   },
