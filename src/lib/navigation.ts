@@ -75,6 +75,12 @@ export const navigation: NavSection[] = [
     section: 'DEVELOPMENT',
     items: [
       { label: 'Content Manager', href: '/development/content-manager', icon: 'FolderOpen' },
+      // No page.tsx here on purpose — falls through to the (app)/[...slug]
+      // catch-all placeholder, same as the PREVIEW section items below. The
+      // real functionality (ranking weights, prompts) moved to PCx Platform >
+      // AI Configuration; this stays as a placeholder for whatever
+      // Development-side Career Builder surface gets built here later.
+      { label: 'Career Builder', href: '/development/career-builder', icon: 'Trophy' },
       { label: 'Calendar', href: '/development/calendar', icon: 'Calendar' },
     ],
   },
