@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import {
-  Building2, Users, ExternalLink, Pencil, Trash2, Plus, Check, X,
+  Building2, Users, ExternalLink, Pencil, Trash2, Plus, Check, X, Mail, History,
 } from 'lucide-react';
 import LeadershipTeamEditor from '@/components/LeadershipTeamEditor';
 import VendorsSection, { type ProfileVendor } from '@/components/VendorsSection';
@@ -36,6 +36,13 @@ function initials(name: string) {
 function formatDate(val: string | null | undefined) {
   if (!val) return '—';
   return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDateTime(val: string | null | undefined) {
+  if (!val) return '—';
+  return new Date(val).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
 }
 
 function TypeBadge({ type }: { type: 'office' | 'team' }) {
@@ -72,6 +79,24 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function PlanBadge({ tier }: { tier: 'free' | 'paid' }) {
+  const isPaid = tier === 'paid';
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${isPaid ? 'bg-teal-50 text-teal-700' : 'bg-gray-100 text-gray-500'}`}>
+      {isPaid ? 'Paid' : 'Free'}
+    </span>
+  );
+}
+
+interface AuditEntry {
+  id: string;
+  actorName: string | null;
+  action: string;
+  section: string;
+  summary: string;
+  createdAt: string;
+}
+
 interface AdditionalLink { label: string; url: string }
 interface VideoItem { _key: string; title: string; source: 'YouTube' | 'Vimeo'; url: string }
 interface ResourceItem { _key: string; name: string; type: 'Link' | 'Document'; url: string; videoUrl: string }
@@ -87,10 +112,13 @@ interface FormState {
   mlsWebsite: string;
   boardOfRealtorsWebsite: string;
   trainingCalendarUrl: string;
+  googleDriveUrl: string;
   officeCrmUrl: string;
   additionalLinks: AdditionalLink[];
   videos: VideoItem[];
   resources: ResourceItem[];
+  senderDisplayName: string;
+  replyToEmail: string;
 }
 
 export default function WorkspaceSettingsView({
@@ -103,7 +131,7 @@ export default function WorkspaceSettingsView({
   const canManage = data.access.canManage;
   const uid = useId();
 
-  const [form, setForm] = useState<FormState>({
+  const initialForm: FormState = {
     clientFacingName: data.clientFacingName ?? '',
     timeZone: data.timeZone ?? 'America/Phoenix',
     address: data.brandingConfig?.address ?? '',
@@ -114,6 +142,7 @@ export default function WorkspaceSettingsView({
     mlsWebsite: data.settingsConfig?.mls_website ?? '',
     boardOfRealtorsWebsite: data.settingsConfig?.board_of_realtors_website ?? '',
     trainingCalendarUrl: data.settingsConfig?.training_calendar_url ?? '',
+    googleDriveUrl: data.settingsConfig?.google_drive_url ?? '',
     officeCrmUrl: data.settingsConfig?.office_crm_url ?? '',
     additionalLinks: data.settingsConfig?.additional_links ?? [],
     videos: (data.settingsConfig?.videos ?? []).map((v, i) => ({
@@ -129,7 +158,11 @@ export default function WorkspaceSettingsView({
       url: r.url,
       videoUrl: r.video_url ?? '',
     })),
-  });
+    senderDisplayName: data.email.senderDisplayName ?? '',
+    replyToEmail: data.email.replyToEmail ?? '',
+  };
+
+  const [form, setForm] = useState<FormState>(initialForm);
 
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -231,12 +264,78 @@ export default function WorkspaceSettingsView({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[] | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  const loadAudit = useCallback(async () => {
+    setAuditLoading(true);
+    setAuditError(null);
+    try {
+      const res = await fetch(`/api/workspaces/${data.id}/audit`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Could not load audit history.');
+      setAuditEntries((await res.json()) as AuditEntry[]);
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : 'Could not load audit history.');
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [data.id]);
+
+  function toggleAudit() {
+    const next = !auditOpen;
+    setAuditOpen(next);
+    if (next && auditEntries === null && !auditLoading) void loadAudit();
+  }
+
+  // Dirty when the form differs from the last saved snapshot.
+  const [savedJson, setSavedJson] = useState(() => JSON.stringify(initialForm));
+  const dirty = savedJson !== JSON.stringify(form);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
   async function handleSave() {
+    const emailChanged =
+      form.senderDisplayName.trim() !== (data.email.senderDisplayName ?? '') ||
+      form.replyToEmail.trim() !== (data.email.replyToEmail ?? '');
+    const replyTo = form.replyToEmail.trim();
+
+    // Validate Reply-To before any write so a bad value can't half-save.
+    if (emailChanged && replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+      setSaveError('Reply-To Email must be a valid email address.');
+      return;
+    }
+
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
     try {
-      const res = await fetch(`/api/workspaces/${data.id}/profile`, {
+      // Email first: it's the validated request, so a rejection stops here.
+      if (emailChanged) {
+        const emailRes = await fetch(`/api/workspaces/${data.id}/email`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            senderDisplayName: form.senderDisplayName.trim() || null,
+            replyToEmail: replyTo || null,
+          }),
+        });
+        if (!emailRes.ok) {
+          const body = (await emailRes.json().catch(() => ({}))) as { message?: string };
+          throw new Error(body.message ?? 'Failed to save email settings.');
+        }
+      }
+
+      const profileRes = await fetch(`/api/workspaces/${data.id}/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -254,6 +353,7 @@ export default function WorkspaceSettingsView({
             mls_website: form.mlsWebsite || null,
             board_of_realtors_website: form.boardOfRealtorsWebsite || null,
             training_calendar_url: form.trainingCalendarUrl || null,
+            google_drive_url: form.googleDriveUrl || null,
             office_crm_url: form.officeCrmUrl || null,
             additional_links: form.additionalLinks,
             videos: form.videos.map(({ title, source, url }) => ({ title, source, url })),
@@ -266,8 +366,14 @@ export default function WorkspaceSettingsView({
           },
         }),
       });
-      if (!res.ok) throw new Error('Failed to save changes.');
+      if (!profileRes.ok) {
+        const body = (await profileRes.json().catch(() => ({}))) as { message?: string };
+        throw new Error(body.message ?? 'Failed to save changes.');
+      }
+
       setSaveSuccess(true);
+      setSavedJson(JSON.stringify(form));
+      if (auditOpen) void loadAudit();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save changes.');
     } finally {
@@ -288,8 +394,13 @@ export default function WorkspaceSettingsView({
           </div>
           {canManage && (
             <div className="flex items-center gap-3">
-              {saveSuccess && <span className="text-sm text-green-600">Saved</span>}
-              {saveError && <span className="text-sm text-red-500">{saveError}</span>}
+              {saveError ? (
+                <span className="text-sm text-red-500">{saveError}</span>
+              ) : dirty ? (
+                <span className="text-sm text-amber-600">Unsaved changes</span>
+              ) : saveSuccess ? (
+                <span className="text-sm text-green-600">Saved</span>
+              ) : null}
               <button
                 type="button"
                 onClick={handleSave}
@@ -395,7 +506,7 @@ export default function WorkspaceSettingsView({
                   <table className="w-full text-sm">
                     <thead className="border-b border-gray-100">
                       <tr>
-                        {['Name', 'Team Name', 'Assigned Agents', 'Last Active', 'Status'].map((h) => (
+                        {['Team Leader', 'Team Name', 'Plan', 'Active Agents', 'Last Active', 'Status'].map((h) => (
                           <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{h}</th>
                         ))}
                       </tr>
@@ -406,13 +517,14 @@ export default function WorkspaceSettingsView({
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
                               <div className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-semibold shrink-0" style={{ backgroundColor: BRAND }}>
-                                {initials(team.contactName ?? team.name)}
+                                {initials(team.teamLeaderName ?? team.contactName ?? team.name)}
                               </div>
-                              <span className="font-medium text-gray-900">{team.contactName ?? '—'}</span>
+                              <span className="font-medium text-gray-900">{team.teamLeaderName ?? team.contactName ?? '—'}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-gray-600">{team.name}</td>
-                          <td className="px-4 py-3 text-gray-600 font-medium">{team.assignedAgents}</td>
+                          <td className="px-4 py-3"><PlanBadge tier={team.planTier} /></td>
+                          <td className="px-4 py-3 text-gray-600 font-medium">{team.activeAgentCount}</td>
                           <td className="px-4 py-3 text-gray-600">{formatDate(team.lastActive)}</td>
                           <td className="px-4 py-3"><StatusBadge status={team.status} /></td>
                         </tr>
@@ -493,6 +605,56 @@ export default function WorkspaceSettingsView({
           {/* Leadership Team */}
           <LeadershipTeamEditor workspaceId={data.id} initialLeaders={data.leadership} canManage={canManage} />
 
+          {/* Email Settings */}
+          <div className={SECTION}>
+            <div className="flex items-center gap-2 mb-1">
+              <Mail size={15} className="text-gray-400" />
+              <p className={`${SECTION_TITLE} mb-0`}>Email Settings</p>
+            </div>
+            <p className={SECTION_SUB}>
+              The identity used on supported Workspace-generated operational emails. Blank values fall back to the platform default.
+            </p>
+            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+              <div className={FIELD}>
+                <label className={LABEL}>Sender Display Name</label>
+                <input
+                  className={`${INPUT} ${INPUT_FOCUS}`}
+                  value={form.senderDisplayName}
+                  onChange={set('senderDisplayName')}
+                  disabled={!canManage}
+                  placeholder={data.email.effectiveSenderDisplayName}
+                />
+              </div>
+              <div className={FIELD}>
+                <label className={LABEL}>Reply-To Email</label>
+                <input
+                  type="email"
+                  className={`${INPUT} ${INPUT_FOCUS}`}
+                  value={form.replyToEmail}
+                  onChange={set('replyToEmail')}
+                  disabled={!canManage}
+                  placeholder={data.email.effectiveReplyToEmail}
+                />
+              </div>
+              <ReadOnly label="From Address (Platform Managed)" value={data.email.fromEmail} />
+            </div>
+            <p className="mt-3 text-xs text-gray-400">
+              The From address stays on the platform-approved sending domain and can&apos;t be changed here.
+            </p>
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                disabled
+                title="Automated email template management is coming soon."
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-400 cursor-not-allowed"
+              >
+                <Mail size={14} />
+                Manage Automated Email Templates
+              </button>
+              <p className="mt-1.5 text-xs text-gray-400">Subject and body editing lives in Automated Email Templates (coming soon).</p>
+            </div>
+          </div>
+
           {/* Office Resources & Quick Links */}
           <div className={SECTION}>
             <p className={SECTION_TITLE}>Office Resources</p>
@@ -502,6 +664,10 @@ export default function WorkspaceSettingsView({
               <div className={FIELD}>
                 <label className={LABEL}>Training Calendar Link</label>
                 <input className={`${INPUT} ${INPUT_FOCUS}`} value={form.trainingCalendarUrl} onChange={set('trainingCalendarUrl')} disabled={!canManage} placeholder="https://..." />
+              </div>
+              <div className={FIELD}>
+                <label className={LABEL}>Google Drive Link</label>
+                <input className={`${INPUT} ${INPUT_FOCUS}`} value={form.googleDriveUrl} onChange={set('googleDriveUrl')} disabled={!canManage} placeholder="https://drive.google.com/..." />
               </div>
               <div className={FIELD}>
                 <label className={LABEL}>Office CRM</label>
@@ -708,6 +874,65 @@ export default function WorkspaceSettingsView({
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Audit History */}
+          <div className={SECTION}>
+            <div className="flex items-center gap-2 mb-1">
+              <History size={15} className="text-gray-400" />
+              <p className={`${SECTION_TITLE} mb-0`}>Audit History</p>
+            </div>
+            <p className={SECTION_SUB}>Meaningful administrative changes to this Workspace.</p>
+            <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-5">
+              <ReadOnly label="Created By" value={data.audit.createdBy} />
+              <ReadOnly label="Created Date" value={formatDate(data.audit.createdAt ?? data.createdAt)} />
+              <ReadOnly label="Last Updated By" value={data.audit.lastUpdatedBy} />
+              <ReadOnly label="Last Updated Date" value={formatDate(data.audit.lastUpdatedAt ?? data.updatedAt)} />
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleAudit}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              <History size={14} />
+              {auditOpen ? 'Hide Audit History' : 'View Audit History'}
+            </button>
+
+            {auditOpen && (
+              <div className="mt-4">
+                {auditLoading && <p className="text-sm text-gray-400">Loading history…</p>}
+                {auditError && <p className="text-sm text-red-500">{auditError}</p>}
+                {!auditLoading && !auditError && auditEntries?.length === 0 && (
+                  <p className="text-sm text-gray-400">No recorded changes yet.</p>
+                )}
+                {!auditLoading && !auditError && auditEntries && auditEntries.length > 0 && (
+                  <div className="overflow-hidden rounded-lg border border-gray-100">
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-gray-100 bg-gray-50">
+                        <tr>
+                          {['Change', 'Section', 'By', 'When'].map((h) => (
+                            <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {auditEntries.map((entry) => (
+                          <tr key={entry.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-gray-900">{entry.summary}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 capitalize">{entry.section}</span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{entry.actorName ?? 'System'}</td>
+                            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(entry.createdAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Customizations — setup progress */}

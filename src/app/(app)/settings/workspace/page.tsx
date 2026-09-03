@@ -9,9 +9,32 @@ export interface WorkspaceTeamRow {
   id: string;
   name: string;
   contactName: string | null;
+  teamLeaderName: string | null;
+  plan: string | null;
+  planTier: 'free' | 'paid';
   assignedAgents: number;
+  activeAgentCount: number;
   lastActive: string | null;
   status: string;
+}
+
+export interface WorkspaceEmailSettings {
+  senderDisplayName: string | null;
+  replyToEmail: string | null;
+  effectiveSenderDisplayName: string;
+  effectiveReplyToEmail: string;
+  /** Platform From address — read-only. */
+  fromEmail: string;
+  platformSenderDisplayName: string;
+  platformReplyToEmail: string | null;
+}
+
+export interface WorkspaceAuditSummary {
+  createdBy: string | null;
+  createdAt: string | null;
+  lastUpdatedBy: string | null;
+  lastUpdatedAt: string | null;
+  entryCount: number;
 }
 
 export interface WorkspaceSettingsProfile {
@@ -34,11 +57,14 @@ export interface WorkspaceSettingsProfile {
     mls_website?: string;
     board_of_realtors_website?: string;
     training_calendar_url?: string;
+    google_drive_url?: string;
     office_crm_url?: string;
     additional_links?: { label: string; url: string }[];
     videos?: { title: string; source: string; url: string }[];
     resources?: { name: string; type: string; url: string; video_url?: string }[];
   } | null;
+  email: WorkspaceEmailSettings;
+  audit: WorkspaceAuditSummary;
   createdAt: string;
   updatedAt: string;
   reportsTo: { id: string; name: string; type: 'office' | 'team' } | null;
