@@ -18,7 +18,13 @@ function formatDate(iso: string): string {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function PromptPanel() {
+export default function PromptPanel({
+  promptKey,
+  footerNote,
+}: {
+  promptKey: string;
+  footerNote: string;
+}) {
   const [prompt, setPrompt] = useState('');
   const [active, setActive] = useState<PromptConfig | null>(null);
   const [label, setLabel] = useState('');
@@ -29,9 +35,10 @@ export default function PromptPanel() {
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     void (async () => {
       try {
-        const res = await fetch('/api/career-builder/prompt', { credentials: 'include' });
+        const res = await fetch(`/api/career-builder/prompt?key=${promptKey}`, { credentials: 'include' });
         if (res.status === 403) {
           setForbidden(true);
           return;
@@ -49,7 +56,7 @@ export default function PromptPanel() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [promptKey]);
 
   const isValid = prompt.trim().length > 0 && prompt.length <= PROMPT_MAX_LENGTH;
 
@@ -63,7 +70,7 @@ export default function PromptPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ prompt, label: label.trim() || undefined }),
+        body: JSON.stringify({ key: promptKey, prompt, label: label.trim() || undefined }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { message?: string };
@@ -146,11 +153,7 @@ export default function PromptPanel() {
         </div>
       </div>
 
-      <p className="mt-4 text-xs text-gray-400">
-        Every save creates a new version rather than overwriting — the "why" explanations always
-        use the most recently saved prompt. Changing it invalidates every cached explanation, so
-        agents will see freshly generated text on their next queue load.
-      </p>
+      <p className="mt-4 text-xs text-gray-400">{footerNote}</p>
     </div>
   );
 }
