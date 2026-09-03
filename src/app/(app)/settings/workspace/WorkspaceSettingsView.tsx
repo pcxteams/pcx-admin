@@ -264,7 +264,6 @@ export default function WorkspaceSettingsView({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Audit History — loaded on demand when the section is expanded.
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[] | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -290,8 +289,7 @@ export default function WorkspaceSettingsView({
     if (next && auditEntries === null && !auditLoading) void loadAudit();
   }
 
-  // Unsaved-changes guard. A serialized snapshot of the last saved form; the
-  // page is "dirty" whenever the live form differs.
+  // Dirty when the form differs from the last saved snapshot.
   const [savedJson, setSavedJson] = useState(() => JSON.stringify(initialForm));
   const dirty = savedJson !== JSON.stringify(form);
 
@@ -305,12 +303,38 @@ export default function WorkspaceSettingsView({
   }, [dirty]);
 
   async function handleSave() {
+    const emailChanged =
+      form.senderDisplayName.trim() !== (data.email.senderDisplayName ?? '') ||
+      form.replyToEmail.trim() !== (data.email.replyToEmail ?? '');
+    const replyTo = form.replyToEmail.trim();
+
+    // Validate Reply-To before any write so a bad value can't half-save.
+    if (emailChanged && replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+      setSaveError('Reply-To Email must be a valid email address.');
+      return;
+    }
+
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
     try {
-      // 1. Profile (information, branding, resources). The backend re-propagates
-      //    Office Resource changes to Agent Office from this same record.
+      // Email first: it's the validated request, so a rejection stops here.
+      if (emailChanged) {
+        const emailRes = await fetch(`/api/workspaces/${data.id}/email`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            senderDisplayName: form.senderDisplayName.trim() || null,
+            replyToEmail: replyTo || null,
+          }),
+        });
+        if (!emailRes.ok) {
+          const body = (await emailRes.json().catch(() => ({}))) as { message?: string };
+          throw new Error(body.message ?? 'Failed to save email settings.');
+        }
+      }
+
       const profileRes = await fetch(`/api/workspaces/${data.id}/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -342,28 +366,13 @@ export default function WorkspaceSettingsView({
           },
         }),
       });
-      if (!profileRes.ok) throw new Error('Failed to save changes.');
-
-      // 2. Email settings. Sent as a separate request; the whole Save is only
-      //    reported successful when both succeed — a rejected Reply-To
-      //    (validated server-side) surfaces here rather than as a false success.
-      const emailRes = await fetch(`/api/workspaces/${data.id}/email`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          senderDisplayName: form.senderDisplayName.trim() || null,
-          replyToEmail: form.replyToEmail.trim() || null,
-        }),
-      });
-      if (!emailRes.ok) {
-        const body = (await emailRes.json().catch(() => ({}))) as { message?: string };
-        throw new Error(body.message ?? 'Failed to save email settings.');
+      if (!profileRes.ok) {
+        const body = (await profileRes.json().catch(() => ({}))) as { message?: string };
+        throw new Error(body.message ?? 'Failed to save changes.');
       }
 
       setSaveSuccess(true);
       setSavedJson(JSON.stringify(form));
-      // Refresh the audit trail if it's already open so the new entries show.
       if (auditOpen) void loadAudit();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save changes.');

@@ -11,7 +11,6 @@ export interface WorkspaceTeamRow {
   contactName: string | null;
   teamLeaderName: string | null;
   plan: string | null;
-  /** Free/Paid distinction. */
   planTier: 'free' | 'paid';
   assignedAgents: number;
   activeAgentCount: number;
@@ -19,19 +18,17 @@ export interface WorkspaceTeamRow {
   status: string;
 }
 
-/** Per-Workspace email identity + platform fallbacks. */
 export interface WorkspaceEmailSettings {
   senderDisplayName: string | null;
   replyToEmail: string | null;
   effectiveSenderDisplayName: string;
   effectiveReplyToEmail: string;
-  /** Platform-approved From address on the verified domain — read-only here. */
+  /** Platform From address — read-only. */
   fromEmail: string;
   platformSenderDisplayName: string;
   platformReplyToEmail: string | null;
 }
 
-/** Created/Last-Updated summary for the Audit History header. */
 export interface WorkspaceAuditSummary {
   createdBy: string | null;
   createdAt: string | null;
