@@ -29,19 +29,18 @@ export default async function OfficePagePage({
 }: {
   params: Promise<{ workspaceId: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   const { workspaceId } = await params;
   // The read/"Agent Office" surface must only ever show published content — the
   // published endpoint returns null content until the page is published, never
   // the in-progress draft (that lives behind the builder, gated on canEdit).
-  const [data, vendorData] = await Promise.all([
+  const [session, data, vendorData] = await Promise.all([
+    getSession(),
     apiGet<OfficePagePublishedResponse>(`/workspaces/${workspaceId}/office-page/published`),
     // Live, DB-backed Vendors (KAN-99) — resolved server-side for Free Team
     // inheritance, independent of whether the page itself has been published.
     apiGet<{ vendors: AgentOfficeVendor[] }>(`/workspaces/${workspaceId}/vendors/active`),
   ]);
+  if (!session) redirect('/login');
   const activeVendors = vendorData?.vendors ?? [];
 
   // A Free Team's Agent Office is inherited from, and editable only through, its

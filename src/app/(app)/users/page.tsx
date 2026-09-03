@@ -7,19 +7,18 @@ import { type UsersListResponse } from './UsersList';
 import UsersPageClient from './UsersPageClient';
 
 export default async function UsersPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   // apiGet returns null on any non-OK response, including the 403 an Agent
   // (or a user with no active workspace membership) gets from the API —
   // access is enforced there, not by a hardcoded role check here, since
   // Master, PCx Admin, Workspace Manager, and Workspace Leader all have
   // access (scoped differently), unlike the Workspaces page which is
   // Master-only.
-  const [stats, initialList] = await Promise.all([
+  const [session, stats, initialList] = await Promise.all([
+    getSession(),
     apiGet<UsersStats>('/users/stats'),
     apiGet<UsersListResponse>('/users?page=1&perPage=10'),
   ]);
+  if (!session) redirect('/login');
 
   const hasAccess = stats !== null && initialList !== null;
 

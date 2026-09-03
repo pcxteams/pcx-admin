@@ -35,11 +35,12 @@ export default async function TeamDetailPage({
 }: {
   params: Promise<{ teamId: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   const { teamId } = await params;
-  const data = await apiGet<TeamDetail>(`/teams/${teamId}`);
+  const [session, data] = await Promise.all([
+    getSession(),
+    apiGet<TeamDetail>(`/teams/${teamId}`),
+  ]);
+  if (!session) redirect('/login');
 
   // apiGet returns null for any non-OK response (403 out-of-scope, 404
   // unknown id, network error alike) — same "friendly empty state, not a

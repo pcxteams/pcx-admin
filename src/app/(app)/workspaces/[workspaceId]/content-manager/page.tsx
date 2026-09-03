@@ -11,15 +11,16 @@ export default async function ContentManagerPage({
 }: {
   params: Promise<{ workspaceId: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   const { workspaceId } = await params;
   // Initial page-1 load with the default sort (Recently Updated). Client-side
   // interactions refetch with filters/search/sort/pagination applied.
-  const data = await apiGet<ContentListResponse>(
-    `/workspaces/${workspaceId}/content?sort=recently_updated&page=1&pageSize=25`,
-  );
+  const [session, data] = await Promise.all([
+    getSession(),
+    apiGet<ContentListResponse>(
+      `/workspaces/${workspaceId}/content?sort=recently_updated&page=1&pageSize=25`,
+    ),
+  ]);
+  if (!session) redirect('/login');
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">

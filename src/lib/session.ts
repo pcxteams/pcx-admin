@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { headers } from 'next/headers';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
@@ -18,14 +19,10 @@ export interface Session {
 }
 
 /**
- * Reads the current session by forwarding the incoming cookies to the NestJS
- * API's Better Auth `get-session` endpoint. Mirrors v2's server-side `/auth/me`
- * fetch. Returns `null` when there is no valid session.
+ * Keyed on the cookie so React dedupes it per request — the (app) layout and
+ * the page under it both call getSession() on a full page load.
  */
-export async function getSession(): Promise<Session | null> {
-  const cookie = (await headers()).get('cookie') ?? '';
-  if (!cookie) return null;
-
+const loadSession = cache(async (cookie: string): Promise<Session | null> => {
   try {
     const res = await fetch(`${API_URL}/api/auth/get-session`, {
       headers: { cookie },
@@ -37,4 +34,15 @@ export async function getSession(): Promise<Session | null> {
   } catch {
     return null;
   }
+});
+
+/**
+ * Reads the current session by forwarding the incoming cookies to the NestJS
+ * API's Better Auth `get-session` endpoint. Mirrors v2's server-side `/auth/me`
+ * fetch. Returns `null` when there is no valid session.
+ */
+export async function getSession(): Promise<Session | null> {
+  const cookie = (await headers()).get('cookie') ?? '';
+  if (!cookie) return null;
+  return loadSession(cookie);
 }

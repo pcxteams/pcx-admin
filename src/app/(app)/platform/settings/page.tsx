@@ -12,13 +12,14 @@ import PlatformSettingsView from './PlatformSettingsView';
  * defense-in-depth on top of the real authorization boundary.
  */
 export default async function PlatformSettingsPage() {
-  const session = await getSession();
+  const [session, settings] = await Promise.all([
+    getSession(),
+    apiGet<PlatformSettings>('/platform/settings'),
+  ]);
   if (!session) redirect('/login');
 
   const role = session.user.role;
   if (role !== 'master' && role !== 'admin') redirect('/');
-
-  const settings = await apiGet<PlatformSettings>('/platform/settings');
   if (!settings) {
     return (
       <div className="max-w-2xl mx-auto px-8 py-16 text-center">

@@ -125,3 +125,24 @@ body {
   }
 }
 
+
+/* --- Navigation feedback ------------------------------------------------
+   The `loading.tsx` skeletons and the sidebar's pending spinner start
+   invisible and fade in after a short delay, so a fast navigation doesn't
+   flash a placeholder. Not disabled under prefers-reduced-motion: the
+   animation is what reveals the element. */
+@keyframes pcx-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+.skeleton-fade {
+  opacity: 0;
+  animation: pcx-fade-in 150ms ease-out 120ms forwards;
+}
+.nav-pending {
+  opacity: 0;
+}
+.nav-pending.is-pending {
+  animation: pcx-fade-in 120ms ease-out 150ms forwards;
+}

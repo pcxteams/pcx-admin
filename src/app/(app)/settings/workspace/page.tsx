@@ -59,10 +59,11 @@ export interface WorkspaceSettingsProfile {
  * accounts with no home workspace rather than redirecting.
  */
 export default async function WorkspaceSettingsPage() {
-  const session = await getSession();
+  const [session, profile] = await Promise.all([
+    getSession(),
+    apiGet<WorkspaceSettingsProfile>('/workspaces/me'),
+  ]);
   if (!session) redirect('/login');
-
-  const profile = await apiGet<WorkspaceSettingsProfile>('/workspaces/me');
 
   if (!profile) {
     return (
