@@ -20,12 +20,13 @@ async function fetchWorkspaces(cookie: string) {
 }
 
 export default async function WorkspacesPage() {
-  const session = await getSession();
+  // GET /workspaces is master-only on the API, so a non-master's request comes
+  // back 403 -> the same empty shape this page used to pass in by hand.
+  const cookie = (await headers()).get('cookie') ?? '';
+  const [session, data] = await Promise.all([getSession(), fetchWorkspaces(cookie)]);
   if (!session) redirect('/login');
 
   const isMaster = session.user.role === 'master';
-  const cookie = (await headers()).get('cookie') ?? '';
-  const data = isMaster ? await fetchWorkspaces(cookie) : { total: 0, pending: [], active: [] };
 
   return (
     <div className="p-8">

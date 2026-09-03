@@ -4,13 +4,11 @@ import { apiGet } from '@/lib/api';
 import AddTeamForm from './AddTeamForm';
 
 export default async function AddTeamPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   // Same access gate as the Users list page — this form's pickers call the
   // same read-only endpoints, so anyone without directory access shouldn't
   // see the form either.
-  const stats = await apiGet('/users/stats');
+  const [session, stats] = await Promise.all([getSession(), apiGet('/users/stats')]);
+  if (!session) redirect('/login');
   if (stats === null) {
     return (
       <div className="p-8">

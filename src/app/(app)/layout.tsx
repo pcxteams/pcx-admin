@@ -31,15 +31,17 @@ export default async function AppLayout({
     return <>{children}</>;
   }
 
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   // Nav sections marked requiresWorkspaceAccess (e.g. SETTINGS) should show
   // for a workspace Manager/Leader but not an Agent — a distinction the
   // platform role (session.user.role) can't make, since Managers/Leaders/
   // Agents all share the same platform role. Resolve their actual membership
   // role via the same endpoint the self-service workspace pages themselves use.
-  const myWorkspace = await apiGet<MyWorkspaceProfile | null>('/workspaces/me');
+  const [session, myWorkspace] = await Promise.all([
+    getSession(),
+    apiGet<MyWorkspaceProfile | null>('/workspaces/me'),
+  ]);
+  if (!session) redirect('/login');
+
   const hasWorkspaceAccess =
     myWorkspace?.access.membershipRole === 'manager' ||
     myWorkspace?.access.membershipRole === 'leader';

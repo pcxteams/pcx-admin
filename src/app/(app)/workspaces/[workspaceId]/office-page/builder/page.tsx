@@ -9,13 +9,12 @@ export default async function BuilderPage({
 }: {
   params: Promise<{ workspaceId: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
   const { workspaceId } = await params;
-  const data = await apiGet<OfficePageBuilderResponse>(
-    `/workspaces/${workspaceId}/office-page`,
-  );
+  const [session, data] = await Promise.all([
+    getSession(),
+    apiGet<OfficePageBuilderResponse>(`/workspaces/${workspaceId}/office-page`),
+  ]);
+  if (!session) redirect('/login');
 
   // Fall back to the read view when there's no access, when the page is
   // view-only, or when the content is inherited from a Parent Office (a Free

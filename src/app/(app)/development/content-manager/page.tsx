@@ -29,13 +29,19 @@ interface MyWorkspaceProfile {
  * a Workspaces page they also can't access).
  */
 export default async function ContentManagerPickerPage() {
-  const session = await getSession();
+  // Both branches' data is fetched up front, since the branch itself depends
+  // on the session's role. Whichever call doesn't apply to the caller comes
+  // back 403 (null) and is simply not read.
+  const [session, myWorkspace, data] = await Promise.all([
+    getSession(),
+    apiGet<MyWorkspaceProfile | null>('/workspaces/me'),
+    apiGet<WorkspacesData>('/workspaces'),
+  ]);
   if (!session) redirect('/login');
 
   const isPlatformAdmin = session.user.role === 'master' || session.user.role === 'admin';
 
   if (!isPlatformAdmin) {
-    const myWorkspace = await apiGet<MyWorkspaceProfile | null>('/workspaces/me');
     if (myWorkspace?.id) {
       redirect(`/workspaces/${myWorkspace.id}/content-manager`);
     }
@@ -53,7 +59,6 @@ export default async function ContentManagerPickerPage() {
     );
   }
 
-  const data = await apiGet<WorkspacesData>('/workspaces');
   const workspaces = data?.active ?? [];
 
   return (

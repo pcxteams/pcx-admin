@@ -69,12 +69,15 @@ export default async function WorkspaceDetailPage({
 }: {
   params: Promise<{ workspaceId: string }>;
 }) {
-  const session = await getSession();
+  const { workspaceId } = await params;
+  // The API enforces the same master-only boundary, so a non-master's request
+  // comes back 403 (null) and they are redirected below regardless.
+  const [session, data] = await Promise.all([
+    getSession(),
+    apiGet<WorkspaceDetail>(`/workspaces/${workspaceId}`),
+  ]);
   if (!session) redirect('/login');
   if (session.user.role !== 'master') redirect('/workspaces');
-
-  const { workspaceId } = await params;
-  const data = await apiGet<WorkspaceDetail>(`/workspaces/${workspaceId}`);
   if (!data) notFound();
 
   // Vendor invitation is scoped to Office Workspaces (KAN-99) — Team workspaces

@@ -1,13 +1,14 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   LayoutGrid, Settings, House, LayoutDashboard, ArrowLeftRight,
   FileBarChart2, Users, UsersRound, ClipboardList, MessageSquare, FolderOpen,
   BookOpen, Calendar, Building2, GraduationCap, Map, TrendingUp, Trophy,
-  Settings2, BookMarked, PlugZap, Sparkles, ChevronDown, LogOut, type LucideIcon,
+  Settings2, BookMarked, PlugZap, Sparkles, ChevronDown, LogOut, LoaderCircle,
+  type LucideIcon,
 } from 'lucide-react';
 import { navigation, type NavItem } from '@/lib/navigation';
 import { authClient } from '@/lib/auth-client';
@@ -21,9 +22,42 @@ const iconMap: Record<string, LucideIcon> = {
   Settings2, BookMarked, PlugZap, Sparkles,
 };
 
+/**
+ * Split out of NavLink because useLinkStatus only works inside a <Link>.
+ * `pending` flips on click, while usePathname() only updates once the
+ * navigation commits — highlighting on it acknowledges the click right away.
+ */
+function NavLinkBody({ item, isActive }: { item: NavItem; isActive: boolean }) {
+  const { pending } = useLinkStatus();
+  const Icon = iconMap[item.icon];
+  const highlighted = isActive || pending;
+
+  return (
+    <span
+      className={`relative flex items-center gap-2.5 px-3 py-1.5 rounded text-sm transition-colors ${
+        highlighted
+          ? 'bg-slate-700 text-white'
+          : 'text-slate-400 group-hover:bg-slate-800 group-hover:text-slate-200'
+      }`}
+    >
+      {Icon && <Icon size={14} className="flex-shrink-0" />}
+      <span className="truncate">{item.label}</span>
+      {/* Absolutely positioned so it can't shift the label; `nav-pending`
+          holds it invisible for 150ms so fast navigations don't flash it. */}
+      <span
+        aria-hidden
+        className={`nav-pending absolute right-2 top-1/2 -translate-y-1/2 ${
+          pending ? 'is-pending' : ''
+        }`}
+      >
+        <LoaderCircle size={12} className="animate-spin" />
+      </span>
+    </span>
+  );
+}
+
 function NavLink({ item }: { item: NavItem }) {
   const pathname = usePathname();
-  const Icon = iconMap[item.icon];
   // Prefix match (not just exact) so an item whose page has its own
   // sub-routes/tabs (e.g. AI Configuration's Ranking Weights/Prompts tabs)
   // stays highlighted while on any of them. '/' is excluded from prefix
@@ -35,14 +69,10 @@ function NavLink({ item }: { item: NavItem }) {
   return (
     <Link
       href={item.href}
-      className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded text-sm transition-colors ${
-        isActive
-          ? 'bg-slate-700 text-white'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-      }`}
+      aria-current={isActive ? 'page' : undefined}
+      className="group block mx-2"
     >
-      {Icon && <Icon size={14} className="flex-shrink-0" />}
-      <span className="truncate">{item.label}</span>
+      <NavLinkBody item={item} isActive={isActive} />
     </Link>
   );
 }
