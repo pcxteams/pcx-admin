@@ -52,7 +52,11 @@ export function SkeletonPageHeader({
 /** Matches users/StatsCards.tsx. */
 export function SkeletonStatCards({ count = 2 }: { count?: number }) {
   return (
-    <div className={`mb-6 grid gap-4 ${count === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+    <div
+      className={`mb-6 grid gap-4 ${
+        count === 4 ? 'grid-cols-2 lg:grid-cols-4' : count === 3 ? 'grid-cols-3' : 'grid-cols-2'
+      }`}
+    >
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="rounded-xl border border-gray-100 bg-white px-6 py-5">
           <SkeletonBar className="h-3.5 w-20" />
