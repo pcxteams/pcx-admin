@@ -34,20 +34,16 @@ const INPUT =
  * trimmed implementation — some duplication traded for not touching
  * ContentFormModal at all.
  *
- * Known gap, flagged rather than solved here: video-upload and resource
- * content need an S3 upload, and the only upload-url endpoint that exists is
- * workspace-scoped (POST /workspaces/:id/content/upload-url). For "subset"
- * and "global" scope there's no single owning workspace, so a "storage
- * workspace" picker below chooses which workspace's upload path to use —
- * purely for where the file object lives, unrelated to who can see the
- * content. A dedicated master-scoped upload route would be the cleaner fix
- * later.
+ * File uploads: "single" scope uploads through the existing workspace-scoped
+ * route (the content genuinely belongs to that one workspace). "subset" and
+ * "global" scope — where there's no single owning workspace — use the
+ * dedicated POST /master/content/upload-url route instead, keyed
+ * master/content/{id}/{file}, no workspace involved.
  */
 export default function MasterContentView({ workspaces }: { workspaces: Workspace[] }) {
   const [scope, setScope] = useState<Scope>('single');
   const [singleWorkspaceId, setSingleWorkspaceId] = useState(workspaces[0]?.id ?? '');
   const [subsetIds, setSubsetIds] = useState<string[]>([]);
-  const [storageWorkspaceId, setStorageWorkspaceId] = useState(workspaces[0]?.id ?? '');
 
   const [type, setType] = useState<ContentType>('video');
   const [title, setTitle] = useState('');
@@ -76,11 +72,11 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
     setSubsetIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  const needsUpload = (type === 'video' && videoSource === 'upload') || type === 'resource';
-  const uploadWorkspaceId = scope === 'single' ? singleWorkspaceId : storageWorkspaceId;
-
-  async function uploadFile(f: File, workspaceId: string): Promise<{ fileKey: string; fileName: string }> {
-    const urlRes = await fetch(`/api/workspaces/${workspaceId}/content/upload-url`, {
+  async function uploadFile(f: File): Promise<{ fileKey: string; fileName: string }> {
+    const uploadUrlEndpoint = scope === 'single'
+      ? `/api/workspaces/${singleWorkspaceId}/content/upload-url`
+      : '/api/master/content/upload-url';
+    const urlRes = await fetch(uploadUrlEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -104,7 +100,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
     if (!title.trim()) return 'Title is required.';
     if (scope === 'single' && !singleWorkspaceId) return 'Choose a workspace.';
     if (scope === 'subset' && subsetIds.length === 0) return 'Select at least one workspace.';
-    if (needsUpload && !uploadWorkspaceId) return 'Choose a storage workspace for the file.';
     if (type === 'video') {
       if (videoSource === 'embed' && !parseVideoEmbedUrl(videoUrl.trim()))
         return 'Add a YouTube or Vimeo video link.';
@@ -125,10 +120,10 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
           const parsed = parseVideoEmbedUrl(videoUrl.trim())!;
           return { source: 'embed', url: videoUrl.trim(), ...parsed };
         }
-        const upV = await uploadFile(file!, uploadWorkspaceId);
+        const upV = await uploadFile(file!);
         return { source: 'upload', fileKey: upV.fileKey, fileName: upV.fileName, mimeType: file!.type, fileSizeBytes: file!.size };
       case 'resource': {
-        const upR = await uploadFile(file!, uploadWorkspaceId);
+        const upR = await uploadFile(file!);
         return { fileKey: upR.fileKey, fileName: upR.fileName, mimeType: file!.type, fileSizeBytes: file!.size };
       }
       case 'leader_verification':
@@ -293,18 +288,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
           <select className={INPUT} value={verificationType} onChange={(e) => setVerificationType(e.target.value)}>
             {LEADER_VERIFICATION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-        )}
-
-        {needsUpload && scope !== 'single' && (
-          <div>
-            <label className={LABEL}>Storage workspace <span className="text-red-500">*</span></label>
-            <select className={INPUT} value={storageWorkspaceId} onChange={(e) => setStorageWorkspaceId(e.target.value)}>
-              {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-            <p className="mt-1 text-[11px] text-gray-400">
-              Where the file is stored — unrelated to which workspaces can see this content.
-            </p>
-          </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
