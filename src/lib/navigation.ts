@@ -44,6 +44,9 @@ export const navigation: NavSection[] = [
       // Workspace management stays master-only (see workspaces/page.tsx); PCx
       // Admins get Platform Settings but not the Workspaces admin surface.
       { label: 'Workspaces', href: '/workspaces', icon: 'LayoutGrid', requiredRoles: ['master'] },
+      // Master-only, same tier as Workspaces — broadcasting content to every
+      // workspace is treated as sensitive as workspace management itself.
+      { label: 'Content Library', href: '/platform/content', icon: 'FolderOpen', requiredRoles: ['master'] },
       { label: 'Settings', href: '/platform/settings', icon: 'Settings' },
       { label: 'AI Configuration', href: '/platform/ai-configuration', icon: 'Sparkles', requiredRoles: ['master'] },
     ],

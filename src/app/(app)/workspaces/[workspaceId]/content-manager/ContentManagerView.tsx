@@ -387,6 +387,7 @@ export default function ContentManagerView({
           mode={modal.mode}
           type={modal.mode === 'create' ? modal.type : modal.item.type}
           item={modal.mode === 'edit' ? modal.item : undefined}
+          access={access}
           onClose={() => setModal(null)}
           onSaved={onSaved}
         />
