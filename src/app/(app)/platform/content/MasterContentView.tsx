@@ -173,7 +173,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-gray-900">Content Library</h1>
         <p className="text-sm text-gray-400 mt-1">
