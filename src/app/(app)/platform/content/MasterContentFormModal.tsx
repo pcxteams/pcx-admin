@@ -7,7 +7,8 @@ import {
   CONTENT_PRIORITIES, AGENT_LEVELS, CONTENT_PURPOSES, ASSIGNMENT_STATUSES,
   RESOURCE_ACCEPT, VIDEO_ACCEPT, LEADER_VERIFICATION_TYPES, parseVideoEmbedUrl, formatDuration,
   type ContentType, type ContentStatus, type ContentPriority, type AgentLevel, type ContentPurpose,
-  type AssignmentStatus,
+  type AssignmentStatus, type ContentItemDetail, type MasterContentItemSummary,
+  type VideoConfig, type ResourceConfig, type ExternalLinkConfig, type LeaderVerificationConfig,
 } from '@/lib/content';
 
 interface Workspace {
@@ -75,35 +76,64 @@ function readVideoDuration(f: File): Promise<number | null> {
  * offered here (unlike ContentFormModal) — that picker fetches candidates
  * from one workspace's content list, which has no clear meaning for subset/
  * global-scoped master content.
+ *
+ * Edit mode: pre-fills from `item` (the workspace-scoped detail fetch) plus
+ * `summary` (the master-list row, which is where scope/workspaceIds actually
+ * live — ContentItemDetail doesn't carry those). Scope and Type are fixed
+ * once created — shown read-only, not editable — since changing either is a
+ * materially bigger problem (re-scoping content_item_workspace rows, moving
+ * files between storage-key schemes) that's out of scope here. PATCHes to
+ * `patchWorkspaceId`, resolved by the caller via the same logic used to fetch
+ * the row's detail in the first place (any workspace actually in scope for
+ * this item authorizes the write, per the three-way scope check server-side).
  */
 export default function MasterContentFormModal({
-  workspaces, onClose, onSaved,
+  workspaces, mode = 'create', summary, item, patchWorkspaceId, onClose, onSaved,
 }: {
   workspaces: Workspace[];
+  mode?: 'create' | 'edit';
+  summary?: MasterContentItemSummary;
+  item?: ContentItemDetail;
+  patchWorkspaceId?: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (saved: ContentItemDetail) => void;
 }) {
-  const [scope, setScope] = useState<Scope>('single');
-  const [singleWorkspaceId, setSingleWorkspaceId] = useState(workspaces[0]?.id ?? '');
-  const [subsetIds, setSubsetIds] = useState<string[]>([]);
+  const [scope, setScope] = useState<Scope>(summary?.scope ?? 'single');
+  const [singleWorkspaceId, setSingleWorkspaceId] = useState(
+    summary?.scope === 'single' ? (summary.workspaceId ?? '') : (workspaces[0]?.id ?? ''),
+  );
+  const [subsetIds, setSubsetIds] = useState<string[]>(
+    summary?.scope === 'subset' ? summary.workspaceIds : [],
+  );
 
-  const [type, setType] = useState<ContentType>('video');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [status, setStatus] = useState<ContentStatus>('draft');
-  const [estTime, setEstTime] = useState('');
-  const [priority, setPriority] = useState<ContentPriority | ''>('');
-  const [agentLevels, setAgentLevels] = useState<AgentLevel[]>([]);
-  const [purpose, setPurpose] = useState<ContentPurpose | ''>('');
-  const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus | ''>('');
+  const [type, setType] = useState<ContentType>(item?.type ?? 'video');
+  const [title, setTitle] = useState(item?.title ?? '');
+  const [description, setDescription] = useState(item?.description ?? '');
+  const [category, setCategory] = useState(item?.category ?? '');
+  const [status, setStatus] = useState<ContentStatus>(item?.status ?? 'draft');
+  const [estTime, setEstTime] = useState(item?.estTime ?? '');
+  const [priority, setPriority] = useState<ContentPriority | ''>(item?.priority ?? '');
+  const [agentLevels, setAgentLevels] = useState<AgentLevel[]>(item?.agentLevels ?? []);
+  const [purpose, setPurpose] = useState<ContentPurpose | ''>(item?.purpose ?? '');
+  const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus | ''>(
+    item?.assignmentStatus ?? '',
+  );
 
-  const [videoSource, setVideoSource] = useState<'upload' | 'embed'>('embed');
-  const [videoUrl, setVideoUrl] = useState('');
+  const [videoSource, setVideoSource] = useState<'upload' | 'embed'>(
+    item ? ((item.config as VideoConfig)?.source === 'embed' ? 'embed' : 'upload') : 'embed',
+  );
+  const [videoUrl, setVideoUrl] = useState((item?.config as VideoConfig)?.url ?? '');
   const [file, setFile] = useState<File | null>(null);
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [verificationType, setVerificationType] = useState<string>(LEADER_VERIFICATION_TYPES[0].value);
-  const [linkUrl, setLinkUrl] = useState('');
+  const [existingFileName, setExistingFileName] = useState<string | null>(
+    (item?.config as ResourceConfig | VideoConfig)?.fileName ?? null,
+  );
+  const [videoDuration, setVideoDuration] = useState<number | null>(
+    (item?.config as VideoConfig)?.durationSeconds ?? null,
+  );
+  const [verificationType, setVerificationType] = useState<string>(
+    (item?.config as LeaderVerificationConfig)?.verificationType ?? LEADER_VERIFICATION_TYPES[0].value,
+  );
+  const [linkUrl, setLinkUrl] = useState((item?.config as ExternalLinkConfig)?.url ?? '');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +159,7 @@ export default function MasterContentFormModal({
       return;
     }
     setFile(f);
+    setExistingFileName(f.name);
 
     // Auto-detect the video length and fill in Length. Best-effort: some
     // containers (e.g. AVI/MOV) aren't decodable by every browser, in which
@@ -170,14 +201,17 @@ export default function MasterContentFormModal({
 
   function clientValidate(): string | null {
     if (!title.trim()) return 'Title is required.';
-    if (scope === 'single' && !singleWorkspaceId) return 'Choose a workspace.';
-    if (scope === 'subset' && subsetIds.length === 0) return 'Select at least one workspace.';
+    if (mode === 'create') {
+      if (scope === 'single' && !singleWorkspaceId) return 'Choose a workspace.';
+      if (scope === 'subset' && subsetIds.length === 0) return 'Select at least one workspace.';
+    }
     if (type === 'video') {
       if (videoSource === 'embed' && !parseVideoEmbedUrl(videoUrl.trim()))
         return 'Add a YouTube or Vimeo video link.';
-      if (videoSource === 'upload' && !file) return 'Please choose a video file to upload.';
+      if (videoSource === 'upload' && !file && !existingFileName)
+        return 'Please choose a video file to upload.';
     }
-    if (type === 'resource' && !file) return 'Please choose a file to upload.';
+    if (type === 'resource' && !file && !existingFileName) return 'Please choose a file to upload.';
     if (type === 'external_link' && !/^https?:\/\//i.test(linkUrl.trim()))
       return 'The URL must start with http:// or https://.';
     return null;
@@ -187,20 +221,28 @@ export default function MasterContentFormModal({
     switch (type) {
       case 'external_link':
         return { url: linkUrl.trim() };
-      case 'video':
+      case 'video': {
         if (videoSource === 'embed') {
           const parsed = parseVideoEmbedUrl(videoUrl.trim())!;
           return { source: 'embed', url: videoUrl.trim(), ...parsed };
         }
-        const upV = await uploadFile(file!);
-        return {
-          source: 'upload', fileKey: upV.fileKey, fileName: upV.fileName,
-          mimeType: file!.type, fileSizeBytes: file!.size,
-          ...(videoDuration != null ? { durationSeconds: videoDuration } : {}),
-        };
+        if (file) {
+          const upV = await uploadFile(file);
+          return {
+            source: 'upload', fileKey: upV.fileKey, fileName: upV.fileName,
+            mimeType: file.type, fileSizeBytes: file.size,
+            ...(videoDuration != null ? { durationSeconds: videoDuration } : {}),
+          };
+        }
+        // Editing, no new file chosen — keep the existing uploaded file.
+        return { ...(item?.config as VideoConfig), source: 'upload' };
+      }
       case 'resource': {
-        const upR = await uploadFile(file!);
-        return { fileKey: upR.fileKey, fileName: upR.fileName, mimeType: file!.type, fileSizeBytes: file!.size };
+        if (file) {
+          const upR = await uploadFile(file);
+          return { fileKey: upR.fileKey, fileName: upR.fileName, mimeType: file.type, fileSizeBytes: file.size };
+        }
+        return { ...(item?.config as ResourceConfig) };
       }
       case 'leader_verification':
         return { verificationType, leaderActions: ['approve', 'reject'] };
@@ -215,20 +257,29 @@ export default function MasterContentFormModal({
     try {
       const config = await buildConfig();
       const base: Record<string, unknown> = {
-        type, title: title.trim(), description: description.trim() || null,
+        title: title.trim(), description: description.trim() || null,
         category: category || null, status, estTime: estTime.trim() || null, config,
         priority: priority || null, agentLevels, purpose: purpose || null,
         assignmentStatus: assignmentStatus || null,
       };
 
-      const url = scope === 'single'
-        ? `/api/workspaces/${singleWorkspaceId}/content`
-        : '/api/master/content';
-      if (scope === 'subset') base.targetWorkspaceIds = subsetIds;
-      if (scope === 'global') base.broadcastToAllWorkspaces = true;
+      let url: string;
+      let method: 'POST' | 'PATCH';
+      if (mode === 'create') {
+        base.type = type;
+        url = scope === 'single'
+          ? `/api/workspaces/${singleWorkspaceId}/content`
+          : '/api/master/content';
+        method = 'POST';
+        if (scope === 'subset') base.targetWorkspaceIds = subsetIds;
+        if (scope === 'global') base.broadcastToAllWorkspaces = true;
+      } else {
+        url = `/api/workspaces/${patchWorkspaceId}/content/${item!.id}`;
+        method = 'PATCH';
+      }
 
       const res = await fetch(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(base),
@@ -238,7 +289,7 @@ export default function MasterContentFormModal({
         setError(body.message ?? 'Something went wrong. Please try again.');
         return;
       }
-      onSaved();
+      onSaved((await res.json()) as ContentItemDetail);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error. Please try again.');
     } finally {
@@ -251,7 +302,9 @@ export default function MasterContentFormModal({
       <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-gray-100 z-10">
-          <h2 className="text-base font-semibold text-gray-900">Add Content</h2>
+          <h2 className="text-base font-semibold text-gray-900">
+            {mode === 'create' ? 'Add Content' : 'Edit Content'}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -264,71 +317,91 @@ export default function MasterContentFormModal({
 
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
-          {/* Scope picker */}
-          <div>
-            <label className={LABEL}>Scope</label>
-            <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
-              {([
-                { v: 'single', label: 'Single workspace', Icon: Building2 },
-                { v: 'subset', label: 'Specific workspaces', Icon: Users },
-                { v: 'global', label: 'All workspaces', Icon: Globe2 },
-              ] as const).map(({ v, label, Icon }) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setScope(v)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                    scope === v ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Icon size={13} /> {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {scope === 'single' && (
+          {/* Scope — fixed once created, shown read-only in edit mode */}
+          {mode === 'edit' ? (
             <div>
-              <label className={LABEL}>Workspace</label>
-              <select className={INPUT} value={singleWorkspaceId} onChange={(e) => setSingleWorkspaceId(e.target.value)}>
-                {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
+              <label className={LABEL}>Scope</label>
+              <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                {scope === 'global' && (<><Globe2 size={14} className="text-teal-600" /> All workspaces</>)}
+                {scope === 'subset' && (<><Users size={14} className="text-teal-600" /> {subsetIds.length} workspaces</>)}
+                {scope === 'single' && (
+                  <><Building2 size={14} className="text-teal-600" /> {workspaces.find((w) => w.id === singleWorkspaceId)?.name ?? 'Unknown workspace'}</>
+                )}
+              </p>
+              <p className="mt-1 text-[11px] text-gray-400">Scope can&apos;t be changed after creation.</p>
             </div>
-          )}
-
-          {scope === 'subset' && (
-            <div>
-              <label className={LABEL}>Workspaces <span className="text-red-500">*</span></label>
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
-                {workspaces.map((w) => (
-                  <label key={w.id} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={subsetIds.includes(w.id)} onChange={() => toggleSubset(w.id)}
-                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                    {w.name}
-                  </label>
-                ))}
+          ) : (
+            <>
+              <div>
+                <label className={LABEL}>Scope</label>
+                <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
+                  {([
+                    { v: 'single', label: 'Single workspace', Icon: Building2 },
+                    { v: 'subset', label: 'Specific workspaces', Icon: Users },
+                    { v: 'global', label: 'All workspaces', Icon: Globe2 },
+                  ] as const).map(({ v, label, Icon }) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setScope(v)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                        scope === v ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      <Icon size={13} /> {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
 
-          {scope === 'global' && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
-              <CheckSquare size={14} /> Visible to every workspace, including ones created later.
-            </p>
+              {scope === 'single' && (
+                <div>
+                  <label className={LABEL}>Workspace</label>
+                  <select className={INPUT} value={singleWorkspaceId} onChange={(e) => setSingleWorkspaceId(e.target.value)}>
+                    {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {scope === 'subset' && (
+                <div>
+                  <label className={LABEL}>Workspaces <span className="text-red-500">*</span></label>
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
+                    {workspaces.map((w) => (
+                      <label key={w.id} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" checked={subsetIds.includes(w.id)} onChange={() => toggleSubset(w.id)}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                        {w.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {scope === 'global' && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                  <CheckSquare size={14} /> Visible to every workspace, including ones created later.
+                </p>
+              )}
+            </>
           )}
 
           <div>
             <label className={LABEL}>Type</label>
-            <div className="flex flex-wrap gap-1.5">
-              {CONTENT_TYPES.map((t) => (
-                <button key={t} type="button" onClick={() => setType(t)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                    type === t ? 'bg-slate-800 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}>
-                  {TYPE_META[t].label}
-                </button>
-              ))}
-            </div>
+            {mode === 'edit' ? (
+              <p className="text-sm text-gray-600">{TYPE_META[type].label}</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {CONTENT_TYPES.map((t) => (
+                  <button key={t} type="button" onClick={() => setType(t)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                      type === t ? 'bg-slate-800 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}>
+                    {TYPE_META[t].label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -382,7 +455,7 @@ export default function MasterContentFormModal({
                   label="Video file"
                   required
                   accept={VIDEO_ACCEPT}
-                  existingFileName={file?.name ?? null}
+                  existingFileName={existingFileName}
                   onFileChange={onFileChange}
                   hint="Uploaded and stored privately."
                 />
@@ -394,7 +467,7 @@ export default function MasterContentFormModal({
               label="File"
               required
               accept={RESOURCE_ACCEPT}
-              existingFileName={file?.name ?? null}
+              existingFileName={existingFileName}
               onFileChange={onFileChange}
               hint="Stored privately."
             />
@@ -515,7 +588,7 @@ export default function MasterContentFormModal({
           <button type="button" onClick={handleSave} disabled={saving}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 cursor-pointer">
             {saving && <Loader2 size={14} className="animate-spin" />}
-            {saving ? 'Creating…' : 'Create'}
+            {saving ? (mode === 'create' ? 'Creating…' : 'Saving…') : mode === 'create' ? 'Create' : 'Save changes'}
           </button>
         </div>
       </div>

@@ -35,10 +35,11 @@ const EMPTY: MasterContentListResponse = { items: [], total: 0, page: 1, pageSiz
 /**
  * PCx Platform > Content Library — browses master content across every
  * scope (single/subset/global) via GET /master/content, mirroring Content
- * Manager's list-plus-modal pattern. Read-only per row (canManage is always
- * false when reusing ContentRowDetail below) — master content stays
- * create-only here, no edit/status-change surface. Creation itself lives in
- * MasterContentFormModal, opened from "Add Content" below.
+ * Manager's list-plus-modal pattern. Creation and editing both live in
+ * MasterContentFormModal ("Add Content" above the table, "Edit" inside a
+ * row's expanded detail) — scope and Type are fixed once created, everything
+ * else can be edited, including Status (the concrete case that motivated
+ * adding this at all: Draft had no way to become Active).
  */
 export default function MasterContentView({ workspaces }: { workspaces: Workspace[] }) {
   const [data, setData] = useState<MasterContentListResponse>(EMPTY);
@@ -58,6 +59,11 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   const [detail, setDetail] = useState<Record<string, ContentItemDetail>>({});
   const [detailLoading, setDetailLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editing, setEditing] = useState<{
+    summary: MasterContentItemSummary;
+    detail: ContentItemDetail;
+    workspaceId: string;
+  } | null>(null);
 
   const workspaceName = (id: string) => workspaces.find((w) => w.id === id)?.name ?? 'Unknown workspace';
 
@@ -269,6 +275,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
                     workspaceName={workspaceName}
                     resolvedWorkspaceId={resolveWorkspaceIdFor(item)}
                     onToggle={() => toggleExpand(item)}
+                    onEdit={(summary, itemDetail, wsId) => setEditing({ summary, detail: itemDetail, workspaceId: wsId })}
                     meta={meta}
                   />
                 );
@@ -331,9 +338,27 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       {showCreateModal && (
         <MasterContentFormModal
           workspaces={workspaces}
+          mode="create"
           onClose={() => setShowCreateModal(false)}
           onSaved={() => {
             setShowCreateModal(false);
+            reload();
+          }}
+        />
+      )}
+
+      {/* Edit modal */}
+      {editing && (
+        <MasterContentFormModal
+          workspaces={workspaces}
+          mode="edit"
+          summary={editing.summary}
+          item={editing.detail}
+          patchWorkspaceId={editing.workspaceId}
+          onClose={() => setEditing(null)}
+          onSaved={(saved) => {
+            setEditing(null);
+            setDetail((d) => ({ ...d, [saved.id]: saved }));
             reload();
           }}
         />
@@ -371,7 +396,7 @@ function ScopeBadge({ item, workspaceName }: { item: MasterContentItemSummary; w
 /* ------------------------------------------------------------ row */
 
 function RowFragment({
-  item, expanded, detail, detailLoading, workspaceName, resolvedWorkspaceId, onToggle, meta,
+  item, expanded, detail, detailLoading, workspaceName, resolvedWorkspaceId, onToggle, onEdit, meta,
 }: {
   item: MasterContentItemSummary;
   expanded: boolean;
@@ -380,6 +405,7 @@ function RowFragment({
   workspaceName: (id: string) => string;
   resolvedWorkspaceId: string | null;
   onToggle: () => void;
+  onEdit: (item: MasterContentItemSummary, detail: ContentItemDetail, workspaceId: string) => void;
   meta: (typeof TYPE_META)[ContentType];
 }) {
   return (
@@ -433,8 +459,8 @@ function RowFragment({
               <ContentRowDetail
                 detail={detail}
                 workspaceId={resolvedWorkspaceId}
-                canManage={false}
-                onEdit={() => {}}
+                canManage
+                onEdit={() => onEdit(item, detail, resolvedWorkspaceId)}
               />
             ) : (
               <p className="text-sm text-gray-400 py-6">
