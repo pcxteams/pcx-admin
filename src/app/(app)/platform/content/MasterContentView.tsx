@@ -320,9 +320,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
                 <option value="">None</option>
                 {ASSIGNMENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
-              <p className="mt-1 text-[11px] text-gray-400">
-                &quot;Required&quot; auto-assigns this to every agent in scope, now and as new agents join.
-              </p>
             </div>
           </div>
           <div>
