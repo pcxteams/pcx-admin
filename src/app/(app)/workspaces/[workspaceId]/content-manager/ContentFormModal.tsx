@@ -10,10 +10,8 @@ import {
   type ContentItemSummary, type ContentListResponse, type RelatedContentRef,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig,
   type LeaderVerificationConfig, type ContentPriority, type AgentLevel,
-  type ContentPurpose, type AssignmentStatus, type ContentAccess,
+  type ContentPurpose, type AssignmentStatus,
 } from '@/lib/content';
-import { fetchAgentOptions } from '@/lib/users';
-import type { AsyncOption } from '@/components/AsyncSearchableSelect';
 import { TypeIcon } from './content-icons';
 
 const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -48,27 +46,16 @@ function readVideoDuration(f: File): Promise<number | null> {
 }
 
 export default function ContentFormModal({
-  workspaceId, mode, type, item, access, onClose, onSaved,
+  workspaceId, mode, type, item, onClose, onSaved,
 }: {
   workspaceId: string;
   mode: 'create' | 'edit';
   type: ContentType;
   item?: ContentItemDetail;
-  /** Determines whether the assignment-target field below is required. */
-  access: ContentAccess;
   onClose: () => void;
   onSaved: (saved: ContentItemDetail) => void;
 }) {
   const meta = TYPE_META[type];
-
-  // Manager/Leader-created content is never automatically assigned (see
-  // ContentAssignmentSyncService on the API side) — required at creation
-  // time. Master/admin content is scoped instead of per-agent-assigned, so
-  // this doesn't apply to them.
-  const isPlatformAdmin = access.platformRole === 'master' || access.platformRole === 'admin';
-  const needsAssignmentTarget = mode === 'create' && !isPlatformAdmin;
-  const [assignMode, setAssignMode] = useState<'all' | 'specific'>('all');
-  const [assignAgentIds, setAssignAgentIds] = useState<string[]>([]);
 
   const [title, setTitle] = useState(item?.title ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
@@ -261,8 +248,6 @@ export default function ContentFormModal({
       return 'Please choose a file to upload.';
     if (type === 'leader_verification' && !verificationType)
       return 'A verification type is required.';
-    if (needsAssignmentTarget && assignMode === 'specific' && assignAgentIds.length === 0)
-      return 'Select at least one agent, or choose "All agents I manage."';
     return null;
   }
 
@@ -292,10 +277,6 @@ export default function ContentFormModal({
       };
       if (mode === 'create') {
         payload.type = type;
-        if (needsAssignmentTarget) {
-          if (assignMode === 'all') payload.assignToAll = true;
-          else payload.assignToAgentIds = assignAgentIds;
-        }
       }
 
       const res = await fetch(
@@ -593,36 +574,6 @@ export default function ContentFormModal({
             </div>
           </div>
 
-          {/* Assignment target — required for manager/leader-created content */}
-          {needsAssignmentTarget && (
-            <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3.5 space-y-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Assign To <span className="text-red-500">*</span>
-              </p>
-              <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
-                {(['all', 'specific'] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setAssignMode(m)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                      assignMode === m ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    {m === 'all' ? 'All agents I manage' : 'Select specific agents'}
-                  </button>
-                ))}
-              </div>
-              {assignMode === 'specific' && (
-                <AgentAssignField
-                  workspaceId={workspaceId}
-                  value={assignAgentIds}
-                  onChange={setAssignAgentIds}
-                />
-              )}
-            </div>
-          )}
-
           {/* Related content */}
           <RelatedContentField
             workspaceId={workspaceId}
@@ -766,89 +717,6 @@ function RelatedContentField({
       <p className="mt-1 text-[11px] text-gray-400">
         Manually curated links surfaced in this item&apos;s detail panel.
       </p>
-    </div>
-  );
-}
-
-/**
- * Multi-select of a workspace's agents, server-searched via fetchAgentOptions
- * (debounced, same 250ms interval ContentManagerView's own search uses).
- * Chip pattern mirrors RelatedContentField above; the search is server-side
- * here instead of a locally-loaded/filtered list, since agent rosters can be
- * large and this reuses the existing fetchLeaderOptions-style API shape.
- */
-function AgentAssignField({
-  workspaceId, value, onChange,
-}: {
-  workspaceId: string;
-  value: string[];
-  onChange: (ids: string[]) => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [options, setOptions] = useState<AsyncOption[]>([]);
-  const [labelById, setLabelById] = useState<Record<string, string>>({});
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setLoading(true);
-      void fetchAgentOptions(workspaceId, query).then((opts) => {
-        setOptions(opts);
-        setLabelById((prev) => {
-          const next = { ...prev };
-          opts.forEach((o) => { next[o.id] = o.label; });
-          return next;
-        });
-        setLoading(false);
-      });
-    }, 250);
-    return () => clearTimeout(t);
-  }, [workspaceId, query]);
-
-  const selected = new Set(value);
-  const matches = options.filter((o) => !selected.has(o.id));
-
-  return (
-    <div>
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {value.map((id) => (
-            <span key={id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border border-gray-200 text-xs text-gray-600">
-              {labelById[id] ?? id}
-              <button type="button" onClick={() => onChange(value.filter((x) => x !== id))} className="text-gray-400 hover:text-gray-600">
-                <X size={11} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="relative">
-        <input
-          className={INPUT}
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={loading ? 'Searching…' : 'Search agents by name or email…'}
-        />
-        {open && matches.length > 0 && (
-          <>
-            <button type="button" aria-hidden className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-            <div className="absolute left-0 right-0 mt-1 z-50 max-h-52 overflow-y-auto rounded-lg border border-gray-100 bg-white p-1 shadow-xl">
-              {matches.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => { onChange([...value, o.id]); setQuery(''); setOpen(false); }}
-                  className="flex items-center w-full px-2.5 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-50 cursor-pointer text-left"
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
