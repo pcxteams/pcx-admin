@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Globe2, Building2, Users, CheckSquare } from 'lucide-react';
+import { Loader2, Globe2, Building2, Users, CheckSquare, Upload, FileText, X } from 'lucide-react';
 import {
   CONTENT_TYPES, CONTENT_CATEGORIES, TYPE_META,
   CONTENT_PRIORITIES, AGENT_LEVELS, CONTENT_PURPOSES, ASSIGNMENT_STATUSES,
-  RESOURCE_ACCEPT, VIDEO_ACCEPT, LEADER_VERIFICATION_TYPES, parseVideoEmbedUrl,
-  type ContentType, type ContentPriority, type AgentLevel, type ContentPurpose,
+  RESOURCE_ACCEPT, VIDEO_ACCEPT, LEADER_VERIFICATION_TYPES, parseVideoEmbedUrl, formatDuration,
+  type ContentType, type ContentStatus, type ContentPriority, type AgentLevel, type ContentPurpose,
   type AssignmentStatus,
 } from '@/lib/content';
 
@@ -22,23 +22,57 @@ const LABEL = 'block text-xs font-medium text-gray-600 mb-1.5';
 const INPUT =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent';
 
+const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500 MB
+
+/**
+ * Read a video file's duration (seconds) in the browser by loading just its
+ * metadata. Resolves null when the duration can't be determined — an
+ * undecodable container, a stream without a known length, or a load error.
+ * Duplicated from ContentFormModal (see the file-level doc comment below for
+ * why this file doesn't share implementation with it).
+ */
+function readVideoDuration(f: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(f);
+    const video = document.createElement('video');
+    const done = (seconds: number | null) => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute('src');
+      resolve(seconds);
+    };
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const d = video.duration;
+      done(Number.isFinite(d) && d > 0 ? d : null);
+    };
+    video.onerror = () => done(null);
+    video.src = url;
+  });
+}
+
 /**
  * PCx Platform > Content Library — creates master content (see
  * CreateMasterContentDto / POST /master/content on the API side).
  *
  * Deliberately NOT sharing ContentFormModal's implementation: that component
- * is tightly coupled to a single workspaceId + the manager assignment-target
- * field, and reworking it to also carry a multi-workspace scope picker would
- * have meant a riskier refactor of a working, tested form. Fields below
- * mirror it (same lib/content.ts constants/types) but are a separate,
- * trimmed implementation — some duplication traded for not touching
- * ContentFormModal at all.
+ * is tightly coupled to a single workspaceId + edit-mode, and reworking it to
+ * also carry a multi-workspace scope picker would have meant a riskier
+ * refactor of a working, tested form. Fields below mirror it (same
+ * lib/content.ts constants/types, same FileField pattern) but are a
+ * separate, trimmed implementation — some duplication traded for not
+ * touching ContentFormModal at all. This is create-only (no edit mode), so
+ * there's no "existing file from a prior save" concept — FileField's
+ * existingFileName is always just derived from the freshly-chosen file.
  *
  * File uploads: "single" scope uploads through the existing workspace-scoped
  * route (the content genuinely belongs to that one workspace). "subset" and
  * "global" scope — where there's no single owning workspace — use the
  * dedicated POST /master/content/upload-url route instead, keyed
- * master/content/{id}/{file}, no workspace involved.
+ * master/content/{id}/{file}, no workspace involved. Related Content isn't
+ * offered here (unlike ContentFormModal) — that picker fetches candidates
+ * from one workspace's content list, which has no clear meaning for subset/
+ * global-scoped master content.
  */
 export default function MasterContentView({ workspaces }: { workspaces: Workspace[] }) {
   const [scope, setScope] = useState<Scope>('single');
@@ -49,6 +83,9 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [status, setStatus] = useState<ContentStatus>('draft');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [estTime, setEstTime] = useState('');
   const [priority, setPriority] = useState<ContentPriority | ''>('');
   const [agentLevels, setAgentLevels] = useState<AgentLevel[]>([]);
@@ -58,6 +95,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   const [videoSource, setVideoSource] = useState<'upload' | 'embed'>('embed');
   const [videoUrl, setVideoUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [verificationType, setVerificationType] = useState<string>(LEADER_VERIFICATION_TYPES[0].value);
   const [linkUrl, setLinkUrl] = useState('');
 
@@ -70,6 +108,50 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   }
   function toggleSubset(id: string) {
     setSubsetIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function addTag(raw: string) {
+    const t = raw.trim();
+    if (!t) return;
+    if (!tags.some((x) => x.toLowerCase() === t.toLowerCase())) setTags([...tags, t]);
+    setTagInput('');
+  }
+  function onTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === 'Backspace' && !tagInput && tags.length) {
+      setTags(tags.slice(0, -1));
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setError(null);
+    if (!f) return;
+    const max = type === 'video' ? MAX_VIDEO_BYTES : MAX_RESOURCE_BYTES;
+    if (f.size > max) {
+      setError(`File is too large (max ${Math.round(max / 1024 / 1024)} MB).`);
+      return;
+    }
+    if (!f.type) {
+      setError('Could not determine this file’s type. Please choose a different file.');
+      return;
+    }
+    setFile(f);
+
+    // Auto-detect the video length and fill in Length. Best-effort: some
+    // containers (e.g. AVI/MOV) aren't decodable by every browser, in which
+    // case we leave the field for manual entry.
+    if (type === 'video') {
+      setVideoDuration(null);
+      void readVideoDuration(f).then((seconds) => {
+        if (seconds == null) return;
+        setVideoDuration(seconds);
+        const label = formatDuration(seconds);
+        if (label) setEstTime(label);
+      });
+    }
   }
 
   async function uploadFile(f: File): Promise<{ fileKey: string; fileName: string }> {
@@ -121,7 +203,11 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
           return { source: 'embed', url: videoUrl.trim(), ...parsed };
         }
         const upV = await uploadFile(file!);
-        return { source: 'upload', fileKey: upV.fileKey, fileName: upV.fileName, mimeType: file!.type, fileSizeBytes: file!.size };
+        return {
+          source: 'upload', fileKey: upV.fileKey, fileName: upV.fileName,
+          mimeType: file!.type, fileSizeBytes: file!.size,
+          ...(videoDuration != null ? { durationSeconds: videoDuration } : {}),
+        };
       case 'resource': {
         const upR = await uploadFile(file!);
         return { fileKey: upR.fileKey, fileName: upR.fileName, mimeType: file!.type, fileSizeBytes: file!.size };
@@ -141,7 +227,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       const config = await buildConfig();
       const base: Record<string, unknown> = {
         type, title: title.trim(), description: description.trim() || null,
-        category: category || null, estTime: estTime.trim() || null, config,
+        category: category || null, tags, status, estTime: estTime.trim() || null, config,
         priority: priority || null, agentLevels, purpose: purpose || null,
         assignmentStatus: assignmentStatus || null,
       };
@@ -165,6 +251,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       }
       setSavedTitle(title.trim());
       setTitle(''); setDescription(''); setFile(null); setVideoUrl(''); setLinkUrl('');
+      setTags([]); setStatus('draft'); setVideoDuration(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error. Please try again.');
     } finally {
@@ -254,41 +341,115 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
           <input className={INPUT} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Content title" />
         </div>
         <div>
-          <label className={LABEL}>Description</label>
-          <textarea className={`${INPUT} resize-none`} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <label className={LABEL}>
+            {type === 'leader_verification' ? 'Description / Instructions' : 'Description'}
+          </label>
+          <textarea
+            className={`${INPUT} resize-none`}
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={
+              type === 'leader_verification'
+                ? 'What should the leader do to verify this?'
+                : 'Optional description'
+            }
+          />
         </div>
 
         {type === 'video' && (
           <div className="space-y-3">
-            <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
-              {(['embed', 'upload'] as const).map((s) => (
-                <button key={s} type="button" onClick={() => setVideoSource(s)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer ${
-                    videoSource === s ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
-                  }`}>
-                  {s === 'upload' ? 'Upload file' : 'Video link'}
-                </button>
-              ))}
+            <div>
+              <label className={LABEL}>Source</label>
+              <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
+                {(['embed', 'upload'] as const).map((s) => (
+                  <button key={s} type="button" onClick={() => setVideoSource(s)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer ${
+                      videoSource === s ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}>
+                    {s === 'upload' ? 'Upload file' : 'Video link'}
+                  </button>
+                ))}
+              </div>
             </div>
             {videoSource === 'embed' ? (
-              <input key="embed" className={INPUT} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=… or https://vimeo.com/…" />
+              <div key="embed">
+                <label className={LABEL}>Video URL <span className="text-red-500">*</span></label>
+                <input className={INPUT} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=… or https://vimeo.com/…" />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Add a YouTube or Vimeo video link. It plays inside PCx — viewers are never sent to the external site.
+                </p>
+              </div>
             ) : (
-              <input key="upload" type="file" accept={VIDEO_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
+              <FileField
+                key="upload"
+                label="Video file"
+                required
+                accept={VIDEO_ACCEPT}
+                existingFileName={file?.name ?? null}
+                onFileChange={onFileChange}
+                hint="Uploaded and stored privately."
+              />
             )}
           </div>
         )}
         {type === 'resource' && (
-          <input type="file" accept={RESOURCE_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
+          <FileField
+            label="File"
+            required
+            accept={RESOURCE_ACCEPT}
+            existingFileName={file?.name ?? null}
+            onFileChange={onFileChange}
+            hint="Stored privately."
+          />
         )}
         {type === 'external_link' && (
-          <input className={INPUT} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" />
+          <div>
+            <label className={LABEL}>URL <span className="text-red-500">*</span></label>
+            <input className={INPUT} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" />
+            <p className="mt-1 text-[11px] text-gray-400">Opens in a new tab. Must start with http:// or https://</p>
+          </div>
         )}
         {type === 'leader_verification' && (
-          <select className={INPUT} value={verificationType} onChange={(e) => setVerificationType(e.target.value)}>
-            {LEADER_VERIFICATION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <div className="space-y-4">
+            <div>
+              <label className={LABEL}>Verification Type <span className="text-red-500">*</span></label>
+              <select className={INPUT} value={verificationType} onChange={(e) => setVerificationType(e.target.value)}>
+                {LEADER_VERIFICATION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>Leader Actions</label>
+              <div className="flex gap-2">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-green-50 text-green-600 text-xs font-medium">Approve</span>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-red-50 text-red-500 text-xs font-medium">Reject</span>
+              </div>
+              <p className="mt-1 text-[11px] text-gray-400">
+                The leader can approve or reject. On reject, the task is reopened for the agent to retry. Nothing is blocked. The task that triggers this verification is configured in the Builder.
+              </p>
+            </div>
+          </div>
         )}
+
+        <div>
+          <label className={LABEL}>{type === 'video' ? 'Length' : 'Estimated Time'}</label>
+          <input
+            className={INPUT}
+            value={estTime}
+            onChange={(e) => setEstTime(e.target.value)}
+            placeholder={
+              type === 'video' && videoSource === 'upload'
+                ? 'Auto-detected from the video'
+                : 'e.g. 15 min'
+            }
+          />
+          {type === 'video' && videoSource === 'upload' && (
+            <p className="mt-1 text-[11px] text-gray-400">
+              Calculated automatically from the uploaded file. You can override it.
+            </p>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -299,8 +460,12 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
             </select>
           </div>
           <div>
-            <label className={LABEL}>Est. Time</label>
-            <input className={INPUT} value={estTime} onChange={(e) => setEstTime(e.target.value)} placeholder="e.g. 15 min" />
+            <label className={LABEL}>Status</label>
+            <select className={INPUT} value={status} onChange={(e) => setStatus(e.target.value as ContentStatus)}>
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="archive">Archived</option>
+            </select>
           </div>
         </div>
 
@@ -343,6 +508,28 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
           </div>
         </div>
 
+        <div>
+          <label className={LABEL}>Tags</label>
+          <div className="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 px-2 py-1.5 focus-within:ring-2 focus-within:ring-teal-500">
+            {tags.map((t) => (
+              <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-xs text-gray-600">
+                {t}
+                <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))} className="text-gray-400 hover:text-gray-600">
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+            <input
+              className="flex-1 min-w-24 text-sm text-gray-900 placeholder-gray-400 focus:outline-none py-0.5"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={onTagKeyDown}
+              onBlur={() => addTag(tagInput)}
+              placeholder={tags.length ? '' : 'Add a tag and press Enter'}
+            />
+          </div>
+        </div>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         {savedTitle && <p className="text-sm text-teal-700">&quot;{savedTitle}&quot; created.</p>}
 
@@ -354,6 +541,31 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FileField({
+  label, required, accept, existingFileName, onFileChange, hint,
+}: {
+  label: string;
+  required?: boolean;
+  accept: string;
+  existingFileName: string | null;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label className={LABEL}>
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <label className="flex items-center gap-2.5 rounded-lg border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 hover:border-teal-400 hover:text-gray-700 cursor-pointer transition-colors">
+        {existingFileName ? <FileText size={16} className="text-teal-600" /> : <Upload size={16} />}
+        <span className="truncate">{existingFileName ?? 'Choose a file…'}</span>
+        <input type="file" accept={accept} onChange={onFileChange} className="hidden" />
+      </label>
+      {hint && <p className="mt-1 text-[11px] text-gray-400">{hint}</p>}
     </div>
   );
 }
