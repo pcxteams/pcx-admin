@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Globe2, Building2, Users, CheckSquare, Upload, FileText, X } from 'lucide-react';
+import { Loader2, Globe2, Building2, Users, CheckSquare, Upload, FileText } from 'lucide-react';
 import {
   CONTENT_TYPES, CONTENT_CATEGORIES, TYPE_META,
   CONTENT_PRIORITIES, AGENT_LEVELS, CONTENT_PURPOSES, ASSIGNMENT_STATUSES,
@@ -84,8 +84,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState<ContentStatus>('draft');
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
   const [estTime, setEstTime] = useState('');
   const [priority, setPriority] = useState<ContentPriority | ''>('');
   const [agentLevels, setAgentLevels] = useState<AgentLevel[]>([]);
@@ -108,21 +106,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   }
   function toggleSubset(id: string) {
     setSubsetIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
-  function addTag(raw: string) {
-    const t = raw.trim();
-    if (!t) return;
-    if (!tags.some((x) => x.toLowerCase() === t.toLowerCase())) setTags([...tags, t]);
-    setTagInput('');
-  }
-  function onTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addTag(tagInput);
-    } else if (e.key === 'Backspace' && !tagInput && tags.length) {
-      setTags(tags.slice(0, -1));
-    }
   }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -227,7 +210,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       const config = await buildConfig();
       const base: Record<string, unknown> = {
         type, title: title.trim(), description: description.trim() || null,
-        category: category || null, tags, status, estTime: estTime.trim() || null, config,
+        category: category || null, status, estTime: estTime.trim() || null, config,
         priority: priority || null, agentLevels, purpose: purpose || null,
         assignmentStatus: assignmentStatus || null,
       };
@@ -251,7 +234,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       }
       setSavedTitle(title.trim());
       setTitle(''); setDescription(''); setFile(null); setVideoUrl(''); setLinkUrl('');
-      setTags([]); setStatus('draft'); setVideoDuration(null);
+      setStatus('draft'); setVideoDuration(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error. Please try again.');
     } finally {
@@ -505,28 +488,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
                 </label>
               ))}
             </div>
-          </div>
-        </div>
-
-        <div>
-          <label className={LABEL}>Tags</label>
-          <div className="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 px-2 py-1.5 focus-within:ring-2 focus-within:ring-teal-500">
-            {tags.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-xs text-gray-600">
-                {t}
-                <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))} className="text-gray-400 hover:text-gray-600">
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-            <input
-              className="flex-1 min-w-24 text-sm text-gray-900 placeholder-gray-400 focus:outline-none py-0.5"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={onTagKeyDown}
-              onBlur={() => addTag(tagInput)}
-              placeholder={tags.length ? '' : 'Add a tag and press Enter'}
-            />
           </div>
         </div>
 
