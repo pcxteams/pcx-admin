@@ -271,10 +271,10 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
               ))}
             </div>
             {videoSource === 'embed' ? (
-              <input className={INPUT} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
+              <input key="embed" className={INPUT} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
                 placeholder="https://www.youtube.com/watch?v=… or https://vimeo.com/…" />
             ) : (
-              <input type="file" accept={VIDEO_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
+              <input key="upload" type="file" accept={VIDEO_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
             )}
           </div>
         )}
