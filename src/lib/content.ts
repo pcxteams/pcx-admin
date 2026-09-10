@@ -268,6 +268,30 @@ export interface ContentListResponse {
   access: ContentAccess;
 }
 
+/**
+ * A master content row from GET /master/content — every scope
+ * (single/subset/global) in one flat list, unlike ContentItemSummary which
+ * is always implicitly single-workspace. `scope` discriminates which of
+ * `workspaceId`/`workspaceIds` applies: single -> workspaceId set,
+ * workspaceIds empty; subset -> workspaceId null, workspaceIds populated;
+ * global -> both empty/null, visible everywhere. No `usedInCount` — the
+ * backend's toSummary() doesn't compute it for master content.
+ */
+export interface MasterContentItemSummary extends Omit<ContentItemSummary, 'usedInCount'> {
+  workspaceId: string | null;
+  isMasterContent: boolean;
+  isGlobal: boolean;
+  scope: 'single' | 'subset' | 'global';
+  workspaceIds: string[];
+}
+
+export interface MasterContentListResponse {
+  items: MasterContentItemSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 /* ------------------------------------------------------------- presentation */
 
 export const TYPE_META: Record<
@@ -311,7 +335,7 @@ export const STATUS_META: Record<ContentStatus, { label: string; cls: string }> 
 };
 
 /** "Est. Time" column value (manual free text). */
-export function estTimeLabel(item: ContentItemSummary): string {
+export function estTimeLabel(item: Pick<ContentItemSummary, 'estTime'>): string {
   const t = item.estTime?.trim();
   return t ? t : '—';
 }

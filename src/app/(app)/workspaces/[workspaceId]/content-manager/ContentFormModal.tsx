@@ -275,7 +275,9 @@ export default function ContentFormModal({
         purpose: purpose || null,
         assignmentStatus: assignmentStatus || null,
       };
-      if (mode === 'create') payload.type = type;
+      if (mode === 'create') {
+        payload.type = type;
+      }
 
       const res = await fetch(
         mode === 'create'

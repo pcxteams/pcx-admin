@@ -47,6 +47,17 @@ export async function fetchLeaderOptions(workspaceId: string, query: string): Pr
   }));
 }
 
+/**
+ * Agents in a workspace, for the Content Manager's "assign to specific
+ * agents" picker (manager-created content requires an explicit assignment
+ * target — see ContentFormModal).
+ */
+export async function fetchAgentOptions(workspaceId: string, query: string): Promise<AsyncOption[]> {
+  if (!workspaceId) return [];
+  const agents = await fetchUsersByRole(workspaceId, 'agent', query);
+  return agents.map((u) => ({ id: u.id, label: `${u.name} (${u.email})` }));
+}
+
 export type CreateUserRole = 'agent' | 'manager' | 'leader';
 export type VisibilityScopeInput = 'workspace' | 'assigned_agents';
 // KAN-96 (Aug 18 clarification): one combined Onboarding Type replaces the old
