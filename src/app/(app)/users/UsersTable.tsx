@@ -89,10 +89,32 @@ function RowActionsMenu({
 /**
  * Leader shows the agent's primary leader (via agent_leader_assignment) —
  * always "—" for non-agents, who have no "leader of a leader" concept.
- * Career Stage / Pending Actions / Last Active still have no backing data
- * model (no career-stage or activity-tracking columns) — rendered as static
- * "—" placeholders rather than fabricated values.
+ * Agent Level (the Agent's onboarding_type) and Last Active (most recent
+ * session) are now backed and rendered from real data — "—" only when a row
+ * genuinely has no value (a non-Agent has no level; someone who never signed
+ * in has no last-active). Pending Actions still has no backing model (the
+ * tasks/assignments feature isn't built yet) and stays a static "—".
  */
+
+const AGENT_LEVEL_LABELS: Record<string, string> = {
+  new_agent: 'New',
+  transfer_some_experience: 'Producer',
+  transfer_highly_experienced: 'Top Producer',
+};
+
+// Session activity is day-grained (Better Auth updateAge), so a compact
+// relative label reads better than a precise timestamp; older than a week
+// falls back to an absolute US-format date.
+function formatLastActive(iso: string | null): string {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString('en-US');
+}
 interface UsersTableProps {
   items: UsersListItem[];
   onDeleteClick: (user: UsersListItem) => void;
@@ -121,7 +143,7 @@ export default function UsersTable({ items, onDeleteClick, onResendClick, resend
             <th className={TH}>Workspace</th>
             <th className={TH}>User Role</th>
             <th className={TH}>Leader</th>
-            <th className={TH}>Career Stage</th>
+            <th className={TH}>Agent Level</th>
             <th className={TH}>Pending Actions</th>
             <th className={TH}>Last Active</th>
             <th className={TH}>Status</th>
@@ -162,13 +184,21 @@ export default function UsersTable({ items, onDeleteClick, onResendClick, resend
                 </td>
                 <td className={TD}>{u.leaderName ?? <span className="text-gray-400">—</span>}</td>
                 <td className={TD}>
-                  <span className="text-gray-400">—</span>
+                  {u.agentLevel && AGENT_LEVEL_LABELS[u.agentLevel] ? (
+                    AGENT_LEVEL_LABELS[u.agentLevel]
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </td>
                 <td className={TD}>
                   <span className="text-gray-400">—</span>
                 </td>
                 <td className={TD}>
-                  <span className="text-gray-400">—</span>
+                  {u.lastActiveAt ? (
+                    formatLastActive(u.lastActiveAt)
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </td>
                 <td className={TD}>
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.cls}`}>

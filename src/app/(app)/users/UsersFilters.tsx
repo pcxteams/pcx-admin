@@ -23,25 +23,30 @@ const STATUS_OPTIONS = [
 
 // Full vs Limited mirrors workspace_membership.visibility_scope
 // ('workspace' vs 'assigned_agents') for role='leader' rows — a real,
-// backend-enforced filter, not a stub like Career Stage/Last Active below.
+// backend-enforced filter, like Agent Level and Last Active below.
 const LEADER_TYPE_OPTIONS = [
   { value: 'all', label: 'All Leader Types' },
   { value: 'full', label: 'Full Leader' },
   { value: 'limited', label: 'Limited Leader' },
 ];
 
-// Stub filters below: rendered and fully interactive, but there is no
-// backing field in the schema yet (no career-stage or activity-tracking
-// columns), so choosing an option never changes the query. See the
-// Foundational Architecture + implementation plan notes.
-const CAREER_STAGE_OPTIONS = [
-  { value: 'all', label: 'All Career Stages' },
-  { value: 'setup', label: 'Setup' },
-  { value: 'foundations', label: 'Foundations' },
-  { value: 'mastery', label: 'Mastery' },
-  { value: 'wealth_building', label: 'Wealth Building' },
+// Agent Level filters on the Agent's onboarding_type (GET /users?agentLevel=...,
+// see UsersService.list) — the New / Producer / Top Producer tier the ranking
+// engine already keys on. Values are the raw onboarding_type strings so no
+// mapping table is needed, matching the backend. Replaces the former "Career
+// Stage" stub (Setup/Foundations/Mastery/Wealth Building), a hierarchy the
+// Aug 26 AI re-prioritization dropped. Only Agents carry a level.
+const AGENT_LEVEL_OPTIONS = [
+  { value: 'all', label: 'All Agent Levels' },
+  { value: 'new_agent', label: 'New' },
+  { value: 'transfer_some_experience', label: 'Producer' },
+  { value: 'transfer_highly_experienced', label: 'Top Producer' },
 ];
 
+// Last Active IS wired to the API (GET /users?lastActive=...): it filters on
+// the user's most recent Better Auth session (see UsersService.list). The
+// windows are rolling look-back periods (today = last 24h, this_week = last
+// 7d, this_month = last 30d), day-grained by Better Auth's session updateAge.
 const LAST_ACTIVE_OPTIONS = [
   { value: 'all', label: 'Last Active' },
   { value: 'today', label: 'Today' },
@@ -74,8 +79,8 @@ interface UsersFiltersProps {
   onStatusChange: (v: string) => void;
   leaderType: string;
   onLeaderTypeChange: (v: string) => void;
-  careerStage: string;
-  onCareerStageChange: (v: string) => void;
+  agentLevel: string;
+  onAgentLevelChange: (v: string) => void;
   lastActive: string;
   onLastActiveChange: (v: string) => void;
 }
@@ -114,10 +119,10 @@ export default function UsersFilters(props: UsersFiltersProps) {
         onChange={props.onLeaderTypeChange}
       />
       <FilterDropdown
-        label="Career Stage"
-        options={CAREER_STAGE_OPTIONS}
-        value={props.careerStage}
-        onChange={props.onCareerStageChange}
+        label="Agent Level"
+        options={AGENT_LEVEL_OPTIONS}
+        value={props.agentLevel}
+        onChange={props.onAgentLevelChange}
       />
       <FilterDropdown
         label="Last Active"

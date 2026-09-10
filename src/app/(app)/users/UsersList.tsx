@@ -18,6 +18,8 @@ export interface UsersListItem {
   createdAt: string;
   isPrimaryContact: boolean;
   leaderName: string | null;
+  agentLevel: string | null;
+  lastActiveAt: string | null;
 }
 
 export interface UsersListResponse {
@@ -57,8 +59,11 @@ export default function UsersList({
   const [role, setRole] = useState('all');
   const [status, setStatus] = useState('all');
   const [leaderType, setLeaderType] = useState('all');
-  // Stub filters — held in local state only, never sent to the API.
-  const [careerStage, setCareerStage] = useState('all');
+  // Agent Level (Agent onboarding_type: New / Producer / Top Producer) and Last
+  // Active are both wired to the API below. Agent Level replaces the former
+  // "Career Stage" stub, whose Setup/Foundations/Mastery/Wealth-Building
+  // hierarchy the Aug 26 AI re-prioritization dropped.
+  const [agentLevel, setAgentLevel] = useState('all');
   const [lastActive, setLastActive] = useState('all');
 
   const [page, setPage] = useState(initialData.page);
@@ -86,6 +91,8 @@ export default function UsersList({
       if (role !== 'all') params.set('role', role);
       if (status !== 'all') params.set('status', status);
       if (leaderType !== 'all') params.set('leaderType', leaderType);
+      if (agentLevel !== 'all') params.set('agentLevel', agentLevel);
+      if (lastActive !== 'all') params.set('lastActive', lastActive);
       params.set('page', String(page));
       params.set('perPage', String(perPage));
 
@@ -96,7 +103,7 @@ export default function UsersList({
     } finally {
       setLoading(false);
     }
-  }, [search, workspaceId, role, status, leaderType, page, perPage]);
+  }, [search, workspaceId, role, status, leaderType, agentLevel, lastActive, page, perPage]);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -177,10 +184,16 @@ export default function UsersList({
           setLeaderType(v);
           setPage(1);
         }}
-        careerStage={careerStage}
-        onCareerStageChange={setCareerStage}
+        agentLevel={agentLevel}
+        onAgentLevelChange={(v) => {
+          setAgentLevel(v);
+          setPage(1);
+        }}
         lastActive={lastActive}
-        onLastActiveChange={setLastActive}
+        onLastActiveChange={(v) => {
+          setLastActive(v);
+          setPage(1);
+        }}
       />
 
       {resendMessage && (
