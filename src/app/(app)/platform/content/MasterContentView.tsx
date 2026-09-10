@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Search, ChevronDown, ChevronUp, Loader2, Building2, Users, Globe2,
+  Plus, Search, ChevronDown, ChevronUp, Loader2, Building2, Globe2,
 } from 'lucide-react';
 import {
   CONTENT_CATEGORIES, CONTENT_TYPES, TYPE_META, STATUS_META,
@@ -60,7 +60,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   const [detailLoading, setDetailLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editing, setEditing] = useState<{
-    summary: MasterContentItemSummary;
     detail: ContentItemDetail;
     workspaceId: string;
   } | null>(null);
@@ -120,12 +119,11 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
   /** Any workspace this item is actually visible in, to call the existing
    * workspace-scoped detail/download-url routes through — those routes need
    * a workspaceId in the path even though the item itself may not belong to
-   * just one. Single -> its own workspace. Subset -> the first target.
-   * Global -> any workspace at all, since it's visible everywhere. */
+   * just one. Single-workspace master content -> its own workspace. Global
+   * (workspaceId null, the only other case now) -> any workspace at all,
+   * since it's visible everywhere. */
   function resolveWorkspaceIdFor(item: MasterContentItemSummary): string | null {
-    if (item.scope === 'single') return item.workspaceId;
-    if (item.scope === 'subset') return item.workspaceIds[0] ?? null;
-    return workspaces[0]?.id ?? null;
+    return item.workspaceId ?? workspaces[0]?.id ?? null;
   }
 
   async function fetchDetail(item: MasterContentItemSummary) {
@@ -171,7 +169,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Content Library</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Master content for one workspace, a subset, or every workspace at once.
+            Master content, visible to every workspace, present and future.
           </p>
         </div>
         <button
@@ -275,7 +273,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
                     workspaceName={workspaceName}
                     resolvedWorkspaceId={resolveWorkspaceIdFor(item)}
                     onToggle={() => toggleExpand(item)}
-                    onEdit={(summary, itemDetail, wsId) => setEditing({ summary, detail: itemDetail, workspaceId: wsId })}
+                    onEdit={(itemDetail, wsId) => setEditing({ detail: itemDetail, workspaceId: wsId })}
                     meta={meta}
                   />
                 );
@@ -337,7 +335,6 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       {/* Create modal */}
       {showCreateModal && (
         <MasterContentFormModal
-          workspaces={workspaces}
           mode="create"
           onClose={() => setShowCreateModal(false)}
           onSaved={() => {
@@ -350,9 +347,7 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
       {/* Edit modal */}
       {editing && (
         <MasterContentFormModal
-          workspaces={workspaces}
           mode="edit"
-          summary={editing.summary}
           item={editing.detail}
           patchWorkspaceId={editing.workspaceId}
           onClose={() => setEditing(null)}
@@ -369,26 +364,25 @@ export default function MasterContentView({ workspaces }: { workspaces: Workspac
 
 /* ------------------------------------------------------------ scope badge */
 
+/**
+ * Content created via this page is always global now (migration 0032, no
+ * more single/subset/global choice). A single-workspace item can still show
+ * up here, though — master content created via the per-workspace Content
+ * Manager route (isMasterContent true, workspaceId set) is a different flow,
+ * unaffected by this change, and still lists here since listMasterContent
+ * filters purely on isMasterContent.
+ */
 function ScopeBadge({ item, workspaceName }: { item: MasterContentItemSummary; workspaceName: (id: string) => string }) {
-  if (item.scope === 'global') {
+  if (!item.workspaceId) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-gray-600">
         <Globe2 size={12} className="text-teal-600" /> All workspaces
       </span>
     );
   }
-  if (item.scope === 'subset') {
-    const names = item.workspaceIds.map(workspaceName).join(', ');
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-gray-600" title={names}>
-        <Users size={12} className="text-teal-600" /> {item.workspaceIds.length} workspaces
-      </span>
-    );
-  }
   return (
     <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-      <Building2 size={12} className="text-teal-600" />
-      {item.workspaceId ? workspaceName(item.workspaceId) : 'Unknown'}
+      <Building2 size={12} className="text-teal-600" /> {workspaceName(item.workspaceId)}
     </span>
   );
 }
@@ -405,7 +399,7 @@ function RowFragment({
   workspaceName: (id: string) => string;
   resolvedWorkspaceId: string | null;
   onToggle: () => void;
-  onEdit: (item: MasterContentItemSummary, detail: ContentItemDetail, workspaceId: string) => void;
+  onEdit: (detail: ContentItemDetail, workspaceId: string) => void;
   meta: (typeof TYPE_META)[ContentType];
 }) {
   return (
@@ -460,7 +454,7 @@ function RowFragment({
                 detail={detail}
                 workspaceId={resolvedWorkspaceId}
                 canManage
-                onEdit={() => onEdit(item, detail, resolvedWorkspaceId)}
+                onEdit={() => onEdit(detail, resolvedWorkspaceId)}
               />
             ) : (
               <p className="text-sm text-gray-400 py-6">

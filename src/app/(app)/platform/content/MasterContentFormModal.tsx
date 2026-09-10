@@ -1,23 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Loader2, Globe2, Building2, Users, CheckSquare, Upload, FileText } from 'lucide-react';
+import { X, Loader2, Globe2, Upload, FileText } from 'lucide-react';
 import {
   CONTENT_TYPES, CONTENT_CATEGORIES, TYPE_META,
   CONTENT_PRIORITIES, AGENT_LEVELS, CONTENT_PURPOSES, ASSIGNMENT_STATUSES,
   RESOURCE_ACCEPT, VIDEO_ACCEPT, LEADER_VERIFICATION_TYPES, parseVideoEmbedUrl, formatDuration,
   type ContentType, type ContentStatus, type ContentPriority, type AgentLevel, type ContentPurpose,
-  type AssignmentStatus, type ContentItemDetail, type MasterContentItemSummary,
+  type AssignmentStatus, type ContentItemDetail,
   type VideoConfig, type ResourceConfig, type ExternalLinkConfig, type LeaderVerificationConfig,
 } from '@/lib/content';
-
-interface Workspace {
-  id: string;
-  name: string;
-  type: 'office' | 'team';
-}
-
-type Scope = 'single' | 'subset' | 'global';
 
 const LABEL = 'block text-xs font-medium text-gray-600 mb-1.5';
 const INPUT =
@@ -54,58 +46,40 @@ function readVideoDuration(f: File): Promise<number | null> {
 
 /**
  * PCx Platform > Content Library — the "Add content" modal, creating master
- * content (see CreateMasterContentDto / POST /master/content on the API
- * side). Extracted from what was originally the whole page — the list view
- * (MasterContentView) now owns browsing, this owns creation only.
+ * content (always global — see POST /master/content on the API side; no
+ * single/subset/global choice, product decision 2026-09-10). Extracted from
+ * what was originally the whole page — the list view (MasterContentView) now
+ * owns browsing, this owns creation only.
  *
  * Deliberately NOT sharing ContentFormModal's implementation: that component
- * is tightly coupled to a single workspaceId + edit-mode, and reworking it to
- * also carry a multi-workspace scope picker would have meant a riskier
- * refactor of a working, tested form. Fields below mirror it (same
- * lib/content.ts constants/types, same FileField pattern) but are a
+ * is tightly coupled to a single workspaceId + edit-mode. Fields below mirror
+ * it (same lib/content.ts constants/types, same FileField pattern) but are a
  * separate, trimmed implementation — some duplication traded for not
  * touching ContentFormModal at all. This is create-only (no edit mode), so
  * there's no "existing file from a prior save" concept — FileField's
  * existingFileName is always just derived from the freshly-chosen file.
  *
- * File uploads: "single" scope uploads through the existing workspace-scoped
- * route (the content genuinely belongs to that one workspace). "subset" and
- * "global" scope — where there's no single owning workspace — use the
- * dedicated POST /master/content/upload-url route instead, keyed
- * master/content/{id}/{file}, no workspace involved. Related Content isn't
- * offered here (unlike ContentFormModal) — that picker fetches candidates
- * from one workspace's content list, which has no clear meaning for subset/
- * global-scoped master content.
+ * File uploads always go through the dedicated POST /master/content/upload-url
+ * route (keyed master/content/{id}/{file}, no workspace involved) — master
+ * content has no single owning workspace. Related Content isn't offered here
+ * (unlike ContentFormModal) — that picker fetches candidates from one
+ * workspace's content list, which has no clear meaning for content visible
+ * to every workspace.
  *
- * Edit mode: pre-fills from `item` (the workspace-scoped detail fetch) plus
- * `summary` (the master-list row, which is where scope/workspaceIds actually
- * live — ContentItemDetail doesn't carry those). Scope and Type are fixed
- * once created — shown read-only, not editable — since changing either is a
- * materially bigger problem (re-scoping content_item_workspace rows, moving
- * files between storage-key schemes) that's out of scope here. PATCHes to
- * `patchWorkspaceId`, resolved by the caller via the same logic used to fetch
- * the row's detail in the first place (any workspace actually in scope for
- * this item authorizes the write, per the three-way scope check server-side).
+ * Edit mode: pre-fills from `item` (the workspace-scoped detail fetch).
+ * Type is fixed once created — shown read-only, not editable. PATCHes to
+ * `patchWorkspaceId`, resolved by the caller (any workspace authorizes the
+ * write for global content, per the scope check server-side).
  */
 export default function MasterContentFormModal({
-  workspaces, mode = 'create', summary, item, patchWorkspaceId, onClose, onSaved,
+  mode = 'create', item, patchWorkspaceId, onClose, onSaved,
 }: {
-  workspaces: Workspace[];
   mode?: 'create' | 'edit';
-  summary?: MasterContentItemSummary;
   item?: ContentItemDetail;
   patchWorkspaceId?: string;
   onClose: () => void;
   onSaved: (saved: ContentItemDetail) => void;
 }) {
-  const [scope, setScope] = useState<Scope>(summary?.scope ?? 'single');
-  const [singleWorkspaceId, setSingleWorkspaceId] = useState(
-    summary?.scope === 'single' ? (summary.workspaceId ?? '') : (workspaces[0]?.id ?? ''),
-  );
-  const [subsetIds, setSubsetIds] = useState<string[]>(
-    summary?.scope === 'subset' ? summary.workspaceIds : [],
-  );
-
   const [type, setType] = useState<ContentType>(item?.type ?? 'video');
   const [title, setTitle] = useState(item?.title ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
@@ -141,9 +115,6 @@ export default function MasterContentFormModal({
   function toggleAgentLevel(level: AgentLevel) {
     setAgentLevels((prev) => (prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]));
   }
-  function toggleSubset(id: string) {
-    setSubsetIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
@@ -176,10 +147,7 @@ export default function MasterContentFormModal({
   }
 
   async function uploadFile(f: File): Promise<{ fileKey: string; fileName: string }> {
-    const uploadUrlEndpoint = scope === 'single'
-      ? `/api/workspaces/${singleWorkspaceId}/content/upload-url`
-      : '/api/master/content/upload-url';
-    const urlRes = await fetch(uploadUrlEndpoint, {
+    const urlRes = await fetch('/api/master/content/upload-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -201,10 +169,6 @@ export default function MasterContentFormModal({
 
   function clientValidate(): string | null {
     if (!title.trim()) return 'Title is required.';
-    if (mode === 'create') {
-      if (scope === 'single' && !singleWorkspaceId) return 'Choose a workspace.';
-      if (scope === 'subset' && subsetIds.length === 0) return 'Select at least one workspace.';
-    }
     if (type === 'video') {
       if (videoSource === 'embed' && !parseVideoEmbedUrl(videoUrl.trim()))
         return 'Add a YouTube or Vimeo video link.';
@@ -267,12 +231,8 @@ export default function MasterContentFormModal({
       let method: 'POST' | 'PATCH';
       if (mode === 'create') {
         base.type = type;
-        url = scope === 'single'
-          ? `/api/workspaces/${singleWorkspaceId}/content`
-          : '/api/master/content';
+        url = '/api/master/content';
         method = 'POST';
-        if (scope === 'subset') base.targetWorkspaceIds = subsetIds;
-        if (scope === 'global') base.broadcastToAllWorkspaces = true;
       } else {
         url = `/api/workspaces/${patchWorkspaceId}/content/${item!.id}`;
         method = 'PATCH';
@@ -317,74 +277,10 @@ export default function MasterContentFormModal({
 
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
-          {/* Scope — fixed once created, shown read-only in edit mode */}
-          {mode === 'edit' ? (
-            <div>
-              <label className={LABEL}>Scope</label>
-              <p className="text-sm text-gray-600 flex items-center gap-1.5">
-                {scope === 'global' && (<><Globe2 size={14} className="text-teal-600" /> All workspaces</>)}
-                {scope === 'subset' && (<><Users size={14} className="text-teal-600" /> {subsetIds.length} workspaces</>)}
-                {scope === 'single' && (
-                  <><Building2 size={14} className="text-teal-600" /> {workspaces.find((w) => w.id === singleWorkspaceId)?.name ?? 'Unknown workspace'}</>
-                )}
-              </p>
-              <p className="mt-1 text-[11px] text-gray-400">Scope can&apos;t be changed after creation.</p>
-            </div>
-          ) : (
-            <>
-              <div>
-                <label className={LABEL}>Scope</label>
-                <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
-                  {([
-                    { v: 'single', label: 'Single workspace', Icon: Building2 },
-                    { v: 'subset', label: 'Specific workspaces', Icon: Users },
-                    { v: 'global', label: 'All workspaces', Icon: Globe2 },
-                  ] as const).map(({ v, label, Icon }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setScope(v)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                        scope === v ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      <Icon size={13} /> {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {scope === 'single' && (
-                <div>
-                  <label className={LABEL}>Workspace</label>
-                  <select className={INPUT} value={singleWorkspaceId} onChange={(e) => setSingleWorkspaceId(e.target.value)}>
-                    {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {scope === 'subset' && (
-                <div>
-                  <label className={LABEL}>Workspaces <span className="text-red-500">*</span></label>
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
-                    {workspaces.map((w) => (
-                      <label key={w.id} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                        <input type="checkbox" checked={subsetIds.includes(w.id)} onChange={() => toggleSubset(w.id)}
-                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                        {w.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {scope === 'global' && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
-                  <CheckSquare size={14} /> Visible to every workspace, including ones created later.
-                </p>
-              )}
-            </>
-          )}
+          {/* Scope is no longer a choice — every item created here is global */}
+          <p className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 flex items-center gap-2">
+            <Globe2 size={14} /> Visible to every workspace, including ones created later.
+          </p>
 
           <div>
             <label className={LABEL}>Type</label>

@@ -269,20 +269,16 @@ export interface ContentListResponse {
 }
 
 /**
- * A master content row from GET /master/content — every scope
- * (single/subset/global) in one flat list, unlike ContentItemSummary which
- * is always implicitly single-workspace. `scope` discriminates which of
- * `workspaceId`/`workspaceIds` applies: single -> workspaceId set,
- * workspaceIds empty; subset -> workspaceId null, workspaceIds populated;
- * global -> both empty/null, visible everywhere. No `usedInCount` — the
- * backend's toSummary() doesn't compute it for master content.
+ * A master content row from GET /master/content. `workspaceId` null means
+ * global — visible to every workspace, present and future (migration 0032,
+ * no more single/subset/global choice); set means single-workspace master
+ * content created via the per-workspace Content Manager route. No
+ * `usedInCount` — the backend's toSummary() doesn't compute it for master
+ * content.
  */
 export interface MasterContentItemSummary extends Omit<ContentItemSummary, 'usedInCount'> {
   workspaceId: string | null;
   isMasterContent: boolean;
-  isGlobal: boolean;
-  scope: 'single' | 'subset' | 'global';
-  workspaceIds: string[];
 }
 
 export interface MasterContentListResponse {
