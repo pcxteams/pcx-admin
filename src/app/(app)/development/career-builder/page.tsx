@@ -20,10 +20,9 @@ interface MyWorkspaceProfile {
 
 /**
  * The sidebar "Career Builder" item is a global entry point, but topics are
- * workspace-scoped — same picker pattern as
- * (app)/development/content-manager/page.tsx (KAN-90). Master/admin get a
- * workspace picker; a Manager/Leader only ever has one workspace and is
- * resolved straight into it via GET /workspaces/me.
+ * workspace-scoped. Master/admin get a workspace picker; a Manager/Leader
+ * only ever has one workspace and is resolved straight into it via
+ * GET /workspaces/me.
  */
 export default async function CareerBuilderPickerPage() {
   const [session, myWorkspace, data] = await Promise.all([

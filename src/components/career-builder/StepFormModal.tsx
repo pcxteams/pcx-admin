@@ -36,7 +36,7 @@ interface TextConfigShape {
   body?: string | null;
 }
 
-/** Read a video file's duration (seconds) in the browser. Mirrors ContentFormModal.tsx. */
+/** Read a video file's duration (seconds) in the browser. */
 function readVideoDuration(f: File): Promise<number | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(f);
