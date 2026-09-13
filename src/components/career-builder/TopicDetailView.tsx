@@ -315,17 +315,6 @@ export default function TopicDetailView({
             />
           ))
         )}
-
-        <div className="px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setSectionModal({ mode: 'create' })}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-600 hover:text-teal-700 cursor-pointer"
-          >
-            <Plus size={14} />
-            Add Section
-          </button>
-        </div>
       </div>
 
       {topicEditOpen && (

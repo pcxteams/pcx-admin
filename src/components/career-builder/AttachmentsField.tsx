@@ -7,13 +7,23 @@ import { contentApiBase, type Attachment, type CareerBuilderScope } from '@/lib/
 
 const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024; // 50 MB, same cap as a Resource file
 
-/** "Supporting Resources / Attachments" on every step-type edit modal. */
+/**
+ * "Supporting Resources / Attachments" on every step-type edit modal.
+ *
+ * `allowFileUpload` (default true) hides the "Upload File" button — Resource
+ * and Video steps already have their own primary file field, so a second
+ * file-upload affordance here was redundant and, in practice, a source of
+ * confusion (a file added here doesn't satisfy that field's requirement).
+ * Instruction and Plain Text have no file field of their own, so they keep
+ * it — it's their only way to attach a file. "Add Link" stays everywhere.
+ */
 export default function AttachmentsField({
-  scope, value, onChange,
+  scope, value, onChange, allowFileUpload = true,
 }: {
   scope: CareerBuilderScope;
   value: Attachment[];
   onChange: (next: Attachment[]) => void;
+  allowFileUpload?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,15 +150,17 @@ export default function AttachmentsField({
       </div>
 
       <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 disabled:opacity-50 cursor-pointer transition-colors"
-        >
-          {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-          Upload File
-        </button>
+        {allowFileUpload && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 disabled:opacity-50 cursor-pointer transition-colors"
+          >
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            Upload File
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setAddingLink(true)}
@@ -157,7 +169,9 @@ export default function AttachmentsField({
           <Link2 size={12} />
           Add Link
         </button>
-        <input ref={fileInputRef} type="file" accept={RESOURCE_ACCEPT} onChange={handleFile} className="hidden" />
+        {allowFileUpload && (
+          <input ref={fileInputRef} type="file" accept={RESOURCE_ACCEPT} onChange={handleFile} className="hidden" />
+        )}
       </div>
       {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
     </div>

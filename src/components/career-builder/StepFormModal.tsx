@@ -394,7 +394,12 @@ export default function StepFormModal({
             </select>
           </div>
 
-          <AttachmentsField scope={scope} value={attachments} onChange={setAttachments} />
+          <AttachmentsField
+            scope={scope}
+            value={attachments}
+            onChange={setAttachments}
+            allowFileUpload={type === 'instruction' || type === 'plain_text'}
+          />
 
           {type === 'resource' && (
             <RelatedVideoField
