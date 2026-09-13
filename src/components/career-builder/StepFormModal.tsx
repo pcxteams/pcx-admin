@@ -96,10 +96,12 @@ export default function StepFormModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missingFile, setMissingFile] = useState(false);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     setError(null);
+    setMissingFile(false);
     if (!f) return;
     const max = type === 'video' ? MAX_VIDEO_BYTES : MAX_RESOURCE_BYTES;
     if (f.size > max) {
@@ -183,15 +185,20 @@ export default function StepFormModal({
   }
 
   function clientValidate(): string | null {
+    setMissingFile(false);
     if (!title.trim()) return 'Title is required.';
     if (type === 'video') {
       if (videoSource === 'embed') {
         if (!parseVideoEmbedUrl(videoUrl.trim())) return 'Add a YouTube or Vimeo video link.';
       } else if (!file && !existingFileName) {
-        return 'Please choose a video file to upload.';
+        setMissingFile(true);
+        return 'Please upload a file in the Video field above (not Supporting Resources / Attachments).';
       }
     }
-    if (type === 'resource' && !file && !existingFileName) return 'Please choose a file to upload.';
+    if (type === 'resource' && !file && !existingFileName) {
+      setMissingFile(true);
+      return 'Please upload a file in the Resource File field above (not Supporting Resources / Attachments).';
+    }
     return null;
   }
 
@@ -342,7 +349,12 @@ export default function StepFormModal({
                     placeholder="https://vimeo.com/… or YouTube URL"
                   />
                 ) : (
-                  <FileField accept={VIDEO_ACCEPT} existingFileName={existingFileName} onFileChange={onFileChange} />
+                  <FileField
+                    accept={VIDEO_ACCEPT}
+                    existingFileName={existingFileName}
+                    onFileChange={onFileChange}
+                    highlight={missingFile}
+                  />
                 )}
               </div>
             </>
@@ -367,6 +379,7 @@ export default function StepFormModal({
                   existingFileName={existingFileName}
                   onFileChange={onFileChange}
                   hint="PDF, DOCX, PPTX, XLSX — max 50 MB"
+                  highlight={missingFile}
                 />
               </div>
             </>
@@ -430,16 +443,23 @@ export default function StepFormModal({
 /* ---------------------------------------------------------- sub-fields */
 
 function FileField({
-  accept, existingFileName, onFileChange, hint,
+  accept, existingFileName, onFileChange, hint, highlight,
 }: {
   accept: string;
   existingFileName: string | null;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   hint?: string;
+  highlight?: boolean;
 }) {
   return (
     <div>
-      <label className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 px-3 py-6 text-sm text-gray-500 hover:border-teal-400 hover:text-gray-700 cursor-pointer transition-colors text-center">
+      <label
+        className={`flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-3 py-6 text-sm cursor-pointer transition-colors text-center ${
+          highlight
+            ? 'border-red-300 bg-red-50/50 text-red-600 hover:border-red-400'
+            : 'border-gray-300 text-gray-500 hover:border-teal-400 hover:text-gray-700'
+        }`}
+      >
         {existingFileName ? <FileText size={18} className="text-teal-600" /> : <Upload size={18} />}
         <span className="truncate max-w-full">{existingFileName ?? 'Click to upload file'}</span>
         {hint && <span className="text-[11px] text-gray-400">{hint}</span>}
