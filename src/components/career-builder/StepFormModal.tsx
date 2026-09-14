@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { X, Upload, Loader2, FileText, Trash2 } from 'lucide-react';
-import { RESOURCE_ACCEPT, VIDEO_ACCEPT, formatDuration, parseVideoEmbedUrl } from '@/lib/content';
+import {
+  AGENT_LEVELS,
+  CONTENT_CATEGORIES,
+  CONTENT_PRIORITIES,
+  RESOURCE_ACCEPT,
+  VIDEO_ACCEPT,
+  formatDuration,
+  parseVideoEmbedUrl,
+  type AgentLevel,
+  type ContentPriority,
+} from '@/lib/content';
 import {
   contentApiBase, contentItemPath, REQUIREMENT_OPTIONS, STEP_TYPE_META,
   type Attachment, type CareerBuilderScope, type CareerBuilderStepType, type StepDetail,
@@ -73,6 +83,14 @@ export default function StepFormModal({
   const [title, setTitle] = useState(step?.title ?? '');
   const [description, setDescription] = useState(step?.description ?? '');
   const [assignmentStatus, setAssignmentStatus] = useState<string>(step?.assignmentStatus ?? 'required');
+  // Ranking-eligibility fields (career-builder.service.ts's getMyQueue requires
+  // priority, assignmentStatus, and a matching agentLevels tag before a step
+  // can ever reach an agent's queue) — previously not editable anywhere in
+  // this authoring flow, so every step created here was silently invisible to
+  // the ranking engine.
+  const [priority, setPriority] = useState<ContentPriority | ''>(step?.priority ?? '');
+  const [category, setCategory] = useState<string>(step?.category ?? '');
+  const [agentLevels, setAgentLevels] = useState<AgentLevel[]>(step?.agentLevels ?? []);
   const [attachments, setAttachments] = useState<Attachment[]>(step?.attachments ?? []);
 
   const [body, setBody] = useState((step?.config as TextConfigShape | undefined)?.body ?? '');
@@ -218,6 +236,9 @@ export default function StepFormModal({
         config,
         estTime: estTime.trim() || null,
         assignmentStatus,
+        priority: priority || null,
+        category: category || null,
+        agentLevels,
         attachments,
         ...(type === 'resource' ? { relatedContentIds: relatedVideoIds } : {}),
       };
@@ -273,6 +294,12 @@ export default function StepFormModal({
     } finally {
       setDeleting(false);
     }
+  }
+
+  function toggleAgentLevel(level: AgentLevel) {
+    setAgentLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]
+    );
   }
 
   const busy = saving || deleting;
@@ -385,13 +412,65 @@ export default function StepFormModal({
             </>
           )}
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL}>Requirement</label>
+              <select className={INPUT} value={assignmentStatus} onChange={(e) => setAssignmentStatus(e.target.value)}>
+                {REQUIREMENT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>Priority</label>
+              <select
+                className={INPUT}
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as ContentPriority | '')}
+              >
+                <option value="">Not set</option>
+                {CONTENT_PRIORITIES.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label className={LABEL}>Requirement</label>
-            <select className={INPUT} value={assignmentStatus} onChange={(e) => setAssignmentStatus(e.target.value)}>
-              {REQUIREMENT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+            <label className={LABEL}>Category</label>
+            <select className={INPUT} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">Not set</option>
+              {CONTENT_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className={LABEL}>Agent Levels</label>
+            <p className="mb-1.5 text-[11px] text-gray-400">
+              Who this step is eligible to be recommended to. Leave all unchecked and it will
+              never appear in any agent&apos;s ranked queue.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {AGENT_LEVELS.map((l) => {
+                const checked = agentLevels.includes(l.value);
+                return (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => toggleAgentLevel(l.value)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                      checked
+                        ? 'border-teal-600 bg-teal-50 text-teal-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <AttachmentsField
