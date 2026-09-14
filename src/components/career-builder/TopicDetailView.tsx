@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -46,8 +47,28 @@ export default function TopicDetailView({
   const [topicEditOpen, setTopicEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [dragSectionId, setDragSectionId] = useState<string | null>(null);
-  const [dragStep, setDragStep] = useState<{ sectionId: string; stepId: string } | null>(null);
+  // Mouse-driven reordering (not native HTML5 drag-and-drop — dragging a
+  // <tr> is notoriously unreliable across browsers, and native drag events
+  // can't be simulated to test this at all). Refs mirror the state so the
+  // single window "mouseup" listener always sees the latest values instead
+  // of whatever was current when the listener was attached.
+  const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
+  const [overSectionId, setOverSectionId] = useState<string | null>(null);
+  const [draggingStep, setDraggingStep] = useState<{ sectionId: string; stepId: string } | null>(null);
+  const [overStepId, setOverStepId] = useState<string | null>(null);
+  const draggingSectionRef = useRef<string | null>(null);
+  const draggingStepRef = useRef<{ sectionId: string; stepId: string } | null>(null);
+  const reorderSectionsRef = useRef<(fromId: string, toId: string) => void>(() => {});
+  const reorderStepsRef = useRef<(sectionId: string, fromId: string, toId: string) => void>(() => {});
+  // `setTopic` updater functions run asynchronously (React batches state
+  // updates from native window listeners), so a value only assigned inside
+  // one can't be read synchronously right after the setTopic(...) call —
+  // it's still the pre-update value. This ref is the current `topic`,
+  // always in sync, safe to read synchronously from event handlers.
+  const topicRef = useRef<TopicDetail | null>(null);
+  useEffect(() => {
+    topicRef.current = topic;
+  }, [topic]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -156,8 +177,14 @@ export default function TopicDetailView({
   /* ------------------------------------------------------------ reorder */
 
   async function reorderSections(fromId: string, toId: string) {
-    if (!topic || fromId === toId) return;
-    const ids = topic.sections.map((s) => s.id);
+    if (fromId === toId) return;
+
+    // Read the ref, not `topic` — this function is invoked from a native
+    // window "mouseup" listener queued through a ref, where the `topic` in
+    // this function's own closure can be stale.
+    const previous = topicRef.current;
+    if (!previous) return;
+    const ids = previous.sections.map((s) => s.id);
     const from = ids.indexOf(fromId);
     const to = ids.indexOf(toId);
     if (from === -1 || to === -1) return;
@@ -165,8 +192,10 @@ export default function TopicDetailView({
     reordered.splice(from, 1);
     reordered.splice(to, 0, fromId);
 
-    const previous = topic;
-    setTopic({ ...topic, sections: reordered.map((id) => topic.sections.find((s) => s.id === id)!) });
+    const byId = new Map(previous.sections.map((s) => [s.id, s]));
+    const next = { ...previous, sections: reordered.map((id) => byId.get(id)!) };
+    topicRef.current = next;
+    setTopic(next);
 
     const res = await fetch(`${topicsApiBase(scope)}/${topicId}/sections/reorder`, {
       method: 'PATCH',
@@ -174,12 +203,18 @@ export default function TopicDetailView({
       credentials: 'include',
       body: JSON.stringify({ orderedIds: reordered }),
     });
-    if (!res.ok) setTopic(previous);
+    if (!res.ok) {
+      topicRef.current = previous;
+      setTopic(previous);
+    }
   }
 
   async function reorderSteps(sectionId: string, fromId: string, toId: string) {
-    if (!topic || fromId === toId) return;
-    const section = topic.sections.find((s) => s.id === sectionId);
+    if (fromId === toId) return;
+
+    const previous = topicRef.current;
+    if (!previous) return;
+    const section = previous.sections.find((s) => s.id === sectionId);
     if (!section) return;
     const ids = section.steps.map((s) => s.id);
     const from = ids.indexOf(fromId);
@@ -189,13 +224,15 @@ export default function TopicDetailView({
     reordered.splice(from, 1);
     reordered.splice(to, 0, fromId);
 
-    const previous = topic;
-    setTopic({
-      ...topic,
-      sections: topic.sections.map((s) =>
-        s.id === sectionId ? { ...s, steps: reordered.map((id) => s.steps.find((x) => x.id === id)!) } : s,
+    const stepById = new Map(section.steps.map((s) => [s.id, s]));
+    const next = {
+      ...previous,
+      sections: previous.sections.map((s) =>
+        s.id === sectionId ? { ...s, steps: reordered.map((id) => stepById.get(id)!) } : s,
       ),
-    });
+    };
+    topicRef.current = next;
+    setTopic(next);
 
     const res = await fetch(`${contentApiBase(scope)}/reorder`, {
       method: 'PATCH',
@@ -203,7 +240,82 @@ export default function TopicDetailView({
       credentials: 'include',
       body: JSON.stringify({ sectionId, orderedIds: reordered }),
     });
-    if (!res.ok) setTopic(previous);
+    if (!res.ok) {
+      topicRef.current = previous;
+      setTopic(previous);
+    }
+  }
+
+  useEffect(() => {
+    reorderSectionsRef.current = reorderSections;
+    reorderStepsRef.current = reorderSteps;
+  });
+
+  useEffect(() => {
+    draggingSectionRef.current = draggingSectionId;
+  }, [draggingSectionId]);
+  useEffect(() => {
+    draggingStepRef.current = draggingStep;
+  }, [draggingStep]);
+
+  /**
+   * Finds the section/step row under a point via `elementFromPoint`, using
+   * `data-section-id`/`data-step-id` markers on the rows, rather than
+   * `onMouseEnter` on each row. `mouseenter`/`mouseleave` depend on the
+   * browser correctly tracking `relatedTarget` across a pointer move — that
+   * didn't reliably fire for a programmatically-driven drag, so hit-testing
+   * the actual coordinates on every move (and, authoritatively, on drop) is
+   * used instead. It doesn't depend on how the pointer got there.
+   */
+  function hitTest(clientX: number, clientY: number): { sectionId: string | null; stepId: string | null } {
+    const el = document.elementFromPoint(clientX, clientY);
+    const sectionId = (el?.closest('[data-section-id]') as HTMLElement | null)?.dataset.sectionId ?? null;
+    const stepId = (el?.closest('[data-step-id]') as HTMLElement | null)?.dataset.stepId ?? null;
+    return { sectionId, stepId };
+  }
+
+  // Single, stable pair of window listeners (attached once) so a drag ending
+  // outside any row still resolves cleanly. Reads the latest drag state via
+  // refs rather than closing over it, since this effect never re-runs.
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!draggingSectionRef.current && !draggingStepRef.current) return;
+      const { sectionId, stepId } = hitTest(e.clientX, e.clientY);
+      if (draggingSectionRef.current) setOverSectionId(sectionId);
+      if (draggingStepRef.current && stepId) setOverStepId(stepId);
+    }
+    function onMouseUp(e: MouseEvent) {
+      const { sectionId, stepId } = hitTest(e.clientX, e.clientY);
+
+      const fromSection = draggingSectionRef.current;
+      if (fromSection && sectionId && fromSection !== sectionId) {
+        reorderSectionsRef.current(fromSection, sectionId);
+      }
+      setDraggingSectionId(null);
+      setOverSectionId(null);
+
+      const fromStep = draggingStepRef.current;
+      if (fromStep && stepId && fromStep.stepId !== stepId) {
+        reorderStepsRef.current(fromStep.sectionId, fromStep.stepId, stepId);
+      }
+      setDraggingStep(null);
+      setOverStepId(null);
+    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  function startSectionDrag(id: string) {
+    setDraggingSectionId(id);
+    setOverSectionId(id);
+  }
+  function startStepDrag(sectionId: string, stepId: string) {
+    setDraggingStep({ sectionId, stepId });
+    setOverStepId(stepId);
   }
 
   /* -------------------------------------------------------------- render */
@@ -298,19 +410,12 @@ export default function TopicDetailView({
               statusMenuFor={statusMenuFor}
               onToggleStatusMenu={(stepId) => setStatusMenuFor(statusMenuFor === stepId ? null : stepId)}
               onChangeStatus={changeStatus}
-              dragging={dragSectionId === section.id}
-              onDragStart={() => setDragSectionId(section.id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {
-                if (dragSectionId) reorderSections(dragSectionId, section.id);
-                setDragSectionId(null);
-              }}
-              dragStepId={dragStep?.sectionId === section.id ? dragStep.stepId : null}
-              onStepDragStart={(stepId) => setDragStep({ sectionId: section.id, stepId })}
-              onStepDrop={(stepId) => {
-                if (dragStep && dragStep.sectionId === section.id) reorderSteps(section.id, dragStep.stepId, stepId);
-                setDragStep(null);
-              }}
+              dragging={draggingSectionId === section.id}
+              isDropTarget={draggingSectionId !== null && overSectionId === section.id && draggingSectionId !== section.id}
+              onDragHandleMouseDown={() => startSectionDrag(section.id)}
+              dragStepId={draggingStep?.sectionId === section.id ? draggingStep.stepId : null}
+              overStepId={draggingStep?.sectionId === section.id ? overStepId : null}
+              onStepDragHandleMouseDown={(stepId) => startStepDrag(section.id, stepId)}
               busy={busy}
             />
           ))
@@ -354,8 +459,8 @@ function SectionBlock({
   index, section, expandedRow, onToggle, onEdit, onDelete,
   addStepMenuOpen, onToggleAddStepMenu, onAddStep, onEditStep,
   statusMenuFor, onToggleStatusMenu, onChangeStatus,
-  dragging, onDragStart, onDragOver, onDrop,
-  dragStepId, onStepDragStart, onStepDrop, busy,
+  dragging, isDropTarget, onDragHandleMouseDown,
+  dragStepId, overStepId, onStepDragHandleMouseDown, busy,
 }: {
   index: number;
   section: Section;
@@ -371,24 +476,30 @@ function SectionBlock({
   onToggleStatusMenu: (stepId: string) => void;
   onChangeStatus: (stepId: string, status: string) => void;
   dragging: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: () => void;
+  isDropTarget: boolean;
+  onDragHandleMouseDown: () => void;
   dragStepId: string | null;
-  onStepDragStart: (stepId: string) => void;
-  onStepDrop: (stepId: string) => void;
+  overStepId: string | null;
+  onStepDragHandleMouseDown: (stepId: string) => void;
   busy: boolean;
 }) {
   return (
     <div className={dragging ? 'opacity-40' : ''}>
       <div
-        draggable
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50/60 transition-colors"
+        data-section-id={section.id}
+        className={`flex items-center gap-2 px-4 py-3 transition-colors ${
+          isDropTarget ? 'bg-teal-50' : 'hover:bg-gray-50/60'
+        }`}
       >
-        <GripVertical size={14} className="text-gray-200 cursor-grab shrink-0" />
+        <span
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onDragHandleMouseDown();
+          }}
+          className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing shrink-0"
+        >
+          <GripVertical size={14} />
+        </span>
         <button type="button" onClick={onToggle} className="text-gray-400 hover:text-gray-600 cursor-pointer shrink-0">
           {expandedRow ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
@@ -428,8 +539,8 @@ function SectionBlock({
                     onToggleStatusMenu={() => onToggleStatusMenu(step.id)}
                     onChangeStatus={(s) => onChangeStatus(step.id, s)}
                     dragging={dragStepId === step.id}
-                    onDragStart={() => onStepDragStart(step.id)}
-                    onDrop={() => onStepDrop(step.id)}
+                    isDropTarget={overStepId === step.id && dragStepId !== step.id}
+                    onDragHandleMouseDown={() => onStepDragHandleMouseDown(step.id)}
                   />
                 ))}
               </tbody>
@@ -476,7 +587,8 @@ function SectionBlock({
 /* ------------------------------------------------------------------ step */
 
 function StepRow({
-  step, onEdit, statusMenuOpen, onToggleStatusMenu, onChangeStatus, dragging, onDragStart, onDrop,
+  step, onEdit, statusMenuOpen, onToggleStatusMenu, onChangeStatus,
+  dragging, isDropTarget, onDragHandleMouseDown,
 }: {
   step: StepSummary;
   onEdit: () => void;
@@ -484,20 +596,25 @@ function StepRow({
   onToggleStatusMenu: () => void;
   onChangeStatus: (status: string) => void;
   dragging: boolean;
-  onDragStart: () => void;
-  onDrop: () => void;
+  isDropTarget: boolean;
+  onDragHandleMouseDown: () => void;
 }) {
   const meta = STEP_TYPE_META[step.type as CareerBuilderStepType];
   return (
     <tr
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={onDrop}
-      className={`hover:bg-white transition-colors ${dragging ? 'opacity-40' : ''}`}
+      data-step-id={step.id}
+      className={`transition-colors ${dragging ? 'opacity-40' : ''} ${isDropTarget ? 'bg-teal-50' : 'hover:bg-white'}`}
     >
       <td className="px-4 py-2.5">
-        <GripVertical size={13} className="text-gray-200 cursor-grab" />
+        <span
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onDragHandleMouseDown();
+          }}
+          className="inline-flex text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical size={13} />
+        </span>
       </td>
       <td className="px-2 py-2.5">
         <button type="button" onClick={onEdit} className="text-sm font-medium text-gray-800 hover:text-teal-700 cursor-pointer text-left">
@@ -525,6 +642,15 @@ function StepRow({
   );
 }
 
+/**
+ * Renders its open menu through a portal into document.body, positioned via
+ * `fixed` coordinates read from the trigger button's own bounding rect.
+ * This table lives inside an `overflow-hidden` card (for the rounded
+ * corners); a normally-`absolute` dropdown nested that deep gets clipped by
+ * that ancestor regardless of z-index — z-index only controls paint order
+ * among elements that are already visible, it can't undo an ancestor's
+ * overflow clipping. Portaling out of that ancestor is the actual fix.
+ */
 function StepStatusControl({
   status, open, onToggle, onClose, onChange,
 }: {
@@ -535,9 +661,28 @@ function StepStatusControl({
   onChange: (s: string) => void;
 }) {
   const meta = STEP_STATUS_META[status] ?? STEP_STATUS_META.draft;
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) setMenuPos({ top: rect.bottom + 4, left: rect.left });
+
+    // The trigger's position is only read once, on open — close instead of
+    // trying to track it, so the menu never drifts away from a moved button.
+    window.addEventListener('scroll', onClose, true);
+    window.addEventListener('resize', onClose);
+    return () => {
+      window.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [open, onClose]);
+
   return (
-    <div className="relative inline-block">
+    <div className="inline-block">
       <button
+        ref={buttonRef}
         type="button"
         onClick={onToggle}
         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${meta.cls} hover:opacity-80 cursor-pointer`}
@@ -545,10 +690,13 @@ function StepStatusControl({
         {meta.label}
         <ChevronDown size={11} />
       </button>
-      {open && (
+      {open && menuPos && createPortal(
         <>
           <button type="button" aria-hidden className="fixed inset-0 z-40 cursor-default" onClick={onClose} />
-          <div className="absolute left-0 mt-1 z-50 w-36 rounded-lg border border-gray-100 bg-white p-1 shadow-xl">
+          <div
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-50 w-36 rounded-lg border border-gray-100 bg-white p-1 shadow-xl"
+          >
             {(['active', 'draft', 'archive'] as const).map((s) => (
               <button
                 key={s}
@@ -563,7 +711,8 @@ function StepStatusControl({
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );

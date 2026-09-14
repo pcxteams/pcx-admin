@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Loader2, Trophy, GripVertical } from 'lucide-react';
 import {
@@ -16,7 +16,28 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  // Mouse-driven reordering (not native HTML5 drag-and-drop — see
+  // TopicDetailView.tsx for why). `overId` drives the live drop-target
+  // highlight; the actual drop decision hit-tests the cursor position
+  // directly at mouseup, via refs so the listener (attached once) always
+  // sees the latest dragged id.
   const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const dragIdRef = useRef<string | null>(null);
+  const handleDropRef = useRef<(sourceId: string, targetId: string) => void>(() => {});
+  // A card's onClick navigates to it; if the mouseup that ends a drag lands
+  // back on a card, guard against that same gesture also firing a
+  // navigation click for whatever's under the cursor at that moment.
+  const justDraggedRef = useRef(false);
+  // `setTopics` updater functions run asynchronously (React batches state
+  // updates from native window listeners), so a value only assigned inside
+  // one can't be read synchronously right after the setTopics(...) call —
+  // it's still the pre-update value. This ref is the current `topics`,
+  // always in sync, safe to read synchronously from event handlers.
+  const topicsRef = useRef<TopicSummary[]>([]);
+  useEffect(() => {
+    topicsRef.current = topics;
+  }, [topics]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -56,15 +77,18 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
     return scope.kind === 'master' ? t.isMasterContent && !t.workspaceId : !t.isMasterContent || !!t.workspaceId;
   }
 
-  async function handleDrop(targetId: string) {
-    const sourceId = dragId;
-    setDragId(null);
-    if (!sourceId || sourceId === targetId) return;
-    const source = topics.find((t) => t.id === sourceId);
-    const target = topics.find((t) => t.id === targetId);
+  async function handleDrop(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+
+    // Read the ref, not `topics` — this function is invoked from a native
+    // window "mouseup" listener queued through a ref, where the `topics` in
+    // this function's own closure can be stale.
+    const previous = topicsRef.current;
+    const source = previous.find((t) => t.id === sourceId);
+    const target = previous.find((t) => t.id === targetId);
     if (!source || !target || !isOwnScope(source) || !isOwnScope(target)) return;
 
-    const ownIds = topics.filter(isOwnScope).map((t) => t.id);
+    const ownIds = previous.filter(isOwnScope).map((t) => t.id);
     const from = ownIds.indexOf(sourceId);
     const to = ownIds.indexOf(targetId);
     if (from === -1 || to === -1) return;
@@ -72,13 +96,12 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
     reordered.splice(from, 1);
     reordered.splice(to, 0, sourceId);
 
-    const previous = topics;
-    // Optimistic reorder of just the own-scope subset, preserving other rows' positions.
     const ownIdSet = new Set(ownIds);
+    const byId = new Map(previous.map((t) => [t.id, t]));
     let cursor = 0;
-    setTopics((prev) =>
-      prev.map((t) => (ownIdSet.has(t.id) ? topics.find((x) => x.id === reordered[cursor++])! : t)),
-    );
+    const next = previous.map((t) => (ownIdSet.has(t.id) ? byId.get(reordered[cursor++])! : t));
+    topicsRef.current = next;
+    setTopics(next);
 
     const res = await fetch(`${topicsApiBase(scope)}/reorder`, {
       method: 'PATCH',
@@ -86,8 +109,47 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
       credentials: 'include',
       body: JSON.stringify({ orderedIds: reordered }),
     });
-    if (!res.ok) setTopics(previous);
+    if (!res.ok) {
+      topicsRef.current = previous;
+      setTopics(previous);
+    }
   }
+
+  useEffect(() => {
+    dragIdRef.current = dragId;
+  }, [dragId]);
+  useEffect(() => {
+    handleDropRef.current = handleDrop;
+  });
+
+  useEffect(() => {
+    function hitTest(clientX: number, clientY: number): string | null {
+      const el = document.elementFromPoint(clientX, clientY);
+      return (el?.closest('[data-topic-id]') as HTMLElement | null)?.dataset.topicId ?? null;
+    }
+    function onMouseMove(e: MouseEvent) {
+      if (!dragIdRef.current) return;
+      setOverId(hitTest(e.clientX, e.clientY));
+    }
+    function onMouseUp(e: MouseEvent) {
+      const sourceId = dragIdRef.current;
+      if (!sourceId) return;
+      justDraggedRef.current = true;
+      setTimeout(() => {
+        justDraggedRef.current = false;
+      }, 0);
+      const targetId = hitTest(e.clientX, e.clientY);
+      if (targetId) handleDropRef.current(sourceId, targetId);
+      setDragId(null);
+      setOverId(null);
+    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
@@ -138,13 +200,13 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
             return (
               <div
                 key={t.id}
-                draggable={draggable}
-                onDragStart={() => draggable && setDragId(t.id)}
-                onDragOver={(e) => draggable && e.preventDefault()}
-                onDrop={() => draggable && handleDrop(t.id)}
-                onClick={() => router.push(`${basePath}/${t.id}`)}
-                className={`group text-left rounded-xl border border-gray-100 bg-white p-5 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer ${
-                  dragId === t.id ? 'opacity-40' : ''
+                data-topic-id={t.id}
+                onClick={() => {
+                  if (justDraggedRef.current) return;
+                  router.push(`${basePath}/${t.id}`);
+                }}
+                className={`group text-left rounded-xl border p-5 hover:shadow-sm transition-all cursor-pointer ${
+                  dragId === t.id ? 'opacity-40 border-gray-100' : overId === t.id ? 'border-teal-400' : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -152,10 +214,18 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
                     <TopicIcon icon={t.icon} />
                   </span>
                   {draggable && (
-                    <GripVertical
-                      size={14}
-                      className="text-gray-200 group-hover:text-gray-300 cursor-grab"
-                    />
+                    <span
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragId(t.id);
+                        setOverId(t.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-gray-200 group-hover:text-gray-300 cursor-grab active:cursor-grabbing"
+                    >
+                      <GripVertical size={14} />
+                    </span>
                   )}
                 </div>
                 <p className="mt-3 text-sm font-semibold text-gray-900 truncate">{t.title}</p>
