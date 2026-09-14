@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Users, Send, Eye, Clock, ChevronDown, AlertTriangle, X, Building, Copy, FolderOpen } from 'lucide-react';
+import { Building2, Users, Send, Eye, Clock, ChevronDown, AlertTriangle, X, Building, Copy, Trophy } from 'lucide-react';
 
 interface PendingWorkspace {
   id: string;
@@ -328,7 +328,7 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                   <th className={TH}>Monthly</th>
                   <th className={TH}>Users</th>
                   <th className={TH}>Office Page</th>
-                  <th className={TH}>Content</th>
+                  <th className={TH}>Career Builder</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -394,10 +394,10 @@ export default function WorkspacesList({ data }: { data: WorkspacesData }) {
                     </td>
                     <td className={TD}>
                       <Link
-                        href={`/workspaces/${w.id}/content-manager`}
+                        href={`/workspaces/${w.id}/career-builder`}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700"
                       >
-                        <FolderOpen size={13} />
+                        <Trophy size={13} />
                         Manage
                       </Link>
                     </td>

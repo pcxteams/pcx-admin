@@ -1,32 +1,19 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { apiGet } from '@/lib/api';
-import MasterContentView from './MasterContentView';
-
-interface ActiveWorkspace {
-  id: string;
-  name: string;
-  type: 'office' | 'team';
-}
-interface WorkspacesData {
-  active: ActiveWorkspace[];
-}
+import TopicsListView from '@/components/career-builder/TopicsListView';
 
 /**
- * PCx Platform > Content Library — master content that targets a single
- * workspace, a specific subset, or all workspaces (present and future).
- * Master-only (not opened to plain "admin"), same gating tier as the
- * Workspaces admin surface — broadcasting content everywhere is treated as
- * sensitive as workspace management itself. See POST /master/content and
- * CreateMasterContentDto on the API side.
+ * PCx Platform > Content Library — master content, authored through the
+ * same Topic -> Section -> Step hierarchy as workspace Career Builder
+ * (product decision 2026-09-13: master content moves off the flat
+ * create-and-link-to-workspaces model). Master-only (not opened to plain
+ * "admin"), same gating tier as the Workspaces admin surface. See
+ * POST /master/topics and POST /master/content on the API side.
  */
 export default async function PlatformContentPage() {
-  const [session, data] = await Promise.all([
-    getSession(),
-    apiGet<WorkspacesData>('/workspaces'),
-  ]);
+  const session = await getSession();
   if (!session) redirect('/login');
   if (session.user.role !== 'master') redirect('/');
 
-  return <MasterContentView workspaces={data?.active ?? []} />;
+  return <TopicsListView scope={{ kind: 'master' }} basePath="/platform/content" />;
 }
