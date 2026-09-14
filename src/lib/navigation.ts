@@ -70,6 +70,9 @@ export const navigation: NavSection[] = [
     items: [
       { label: 'Users', href: '/users', icon: 'Users' },
       { label: 'Teams', href: '/teams', icon: 'UsersRound', hiddenFromAgent: true },
+      // Read-only Leader view of agent content progress (KAN-98 read slice).
+      // Manager/Leader only — hidden from Agents; the API enforces the same.
+      { label: 'Agent Progress', href: '/team/progress', icon: 'TrendingUp', hiddenFromAgent: true },
       { label: 'Assignments', href: '/team/assignments', icon: 'ClipboardList' },
       { label: 'Communications', href: '/team/communications', icon: 'MessageSquare' },
     ],
