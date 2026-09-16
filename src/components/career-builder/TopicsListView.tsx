@@ -205,7 +205,7 @@ export default function TopicsListView({ scope, basePath }: { scope: CareerBuild
                   if (justDraggedRef.current) return;
                   router.push(`${basePath}/${t.id}`);
                 }}
-                className={`group text-left rounded-xl border p-5 hover:shadow-sm transition-all cursor-pointer ${
+                className={`group text-left rounded-xl border bg-white p-5 hover:shadow-sm transition-all cursor-pointer ${
                   dragId === t.id ? 'opacity-40 border-gray-100' : overId === t.id ? 'border-teal-400' : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
