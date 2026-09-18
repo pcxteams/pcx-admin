@@ -113,7 +113,12 @@ export default async function OfficePagePage({
             // Vendors publish immediately on form submission (KAN-99), independent
             // of the builder's own publish step — shown even if the rest of the
             // office page content hasn't been published yet.
-            <OfficePageView content={data.content ?? { sections: [] }} activeVendors={activeVendors} />
+            <OfficePageView
+              content={data.content ?? { sections: [] }}
+              brokerage={data.brokerage}
+              directory={data.directory ?? {}}
+              activeVendors={activeVendors}
+            />
           ) : (
             <div className="rounded-xl border border-gray-100 bg-white px-6 py-16 text-center">
               <p className="text-sm text-gray-500">

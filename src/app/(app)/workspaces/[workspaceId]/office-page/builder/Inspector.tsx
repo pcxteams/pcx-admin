@@ -3,6 +3,7 @@
 import { Trash2, Plus, ChevronUp, ChevronDown, ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import type { Dispatch } from 'react';
 import type {
+  OfficeMember,
   OfficePageAction,
   OfficePageActionType,
   OfficePageItem,
@@ -81,15 +82,52 @@ function ActionField({
 function FieldInput({
   field,
   item,
+  roster,
   onPatch,
 }: {
   field: InspectorField;
   item: OfficePageItem;
+  roster: OfficeMember[];
   onPatch: (patch: Record<string, unknown>) => void;
 }) {
   const raw = get(item, field.key);
 
   switch (field.kind) {
+    /* The blob stores only the membership id; name, title and contact details
+       resolve at render time, so they survive a rename or a role change. */
+    case 'membership': {
+      const current = typeof raw === 'string' ? raw : '';
+      // An id no longer in the roster would otherwise vanish from the select
+      // and be silently rewritten on the next save.
+      const stale = current && !roster.some((m) => m.membershipId === current);
+      return (
+        <>
+          <select
+            value={current}
+            onChange={(e) => onPatch({ [field.key]: e.target.value })}
+            className={INPUT}
+          >
+            <option value="">Not assigned</option>
+            {roster.map((m) => (
+              <option key={m.membershipId} value={m.membershipId}>
+                {m.jobTitle ? `${m.name}, ${m.jobTitle}` : m.name}
+              </option>
+            ))}
+            {stale && <option value={current}>Unknown member ({current.slice(0, 8)}…)</option>}
+          </select>
+          {roster.length === 0 && (
+            <p className="mt-1 text-[11px] text-gray-400">
+              No managers or leaders in this workspace yet. Add them in the Workspace Profile.
+            </p>
+          )}
+          {stale && (
+            <p className="mt-1 text-[11px] text-amber-600">
+              This person is no longer an active manager or leader here, so the card will not render.
+            </p>
+          )}
+        </>
+      );
+    }
     case 'textarea':
       return (
         <textarea
@@ -189,10 +227,13 @@ function FieldInput({
 export default function Inspector({
   selection,
   content,
+  roster,
   dispatch,
 }: {
   selection: BuilderSelection;
   content: OfficePageContent;
+  /** Managers and leaders this workspace can assign to a card. */
+  roster: OfficeMember[];
   dispatch: Dispatch<BuilderAction>;
 }) {
   if (selection.kind === 'none') {
@@ -251,6 +292,14 @@ export default function Inspector({
           Visible on the agent page
         </label>
 
+        {/* No items of its own, so an "Add detail" button would be a dead end. */}
+        {section.type === 'brokerage-info' ? (
+          <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-xs leading-relaxed text-gray-500">
+            This section renders the workspace&rsquo;s logo, address and contact
+            details live. Edit them in the Workspace Profile; there is nothing
+            to add here.
+          </p>
+        ) : (
         <div>
           <div className="mb-1 flex items-center justify-between">
             <span className={LABEL}>{noun}s</span>
@@ -325,6 +374,7 @@ export default function Inspector({
             ))}
           </div>
         </div>
+        )}
 
         <div className="pt-1">
           <button
@@ -374,6 +424,7 @@ export default function Inspector({
           <FieldInput
             field={field}
             item={item}
+            roster={roster}
             onPatch={(patch) =>
               dispatch({ type: 'UPDATE_ITEM', sectionKey: section.key, itemId: item.id, patch })
             }

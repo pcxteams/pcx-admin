@@ -11,7 +11,15 @@ import type {
  * v3 content types (membership references, no brokerage/course action types).
  */
 
-export type InspectorFieldKind = 'text' | 'textarea' | 'boolean' | 'color' | 'action' | 'icon';
+export type InspectorFieldKind =
+  | 'text'
+  | 'textarea'
+  | 'boolean'
+  | 'color'
+  | 'action'
+  | 'icon'
+  /** Pick a person from the workspace roster; stores a `workspace_membership.id`. */
+  | 'membership';
 
 export interface InspectorField {
   key: string;
@@ -87,6 +95,14 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
       { key: 'secondaryAction', label: 'Secondary link', kind: 'action', actionTypes: HERO_ACTION_TYPES, actionShowLabel: true },
     ],
   },
+  /** Nothing to edit here: the content is the workspace's live `branding_config`. */
+  'brokerage-info': {
+    label: 'Brokerage Info',
+    itemNoun: 'detail',
+    itemTitle: () => 'Workspace Profile',
+    createItem: (order) => ({ ...base(order) }) as OfficePageItem,
+    fields: [],
+  },
   'vendor-carousel': {
     label: 'Vendor Carousel',
     itemNoun: 'vendor',
@@ -116,6 +132,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
       TITLE_FIELD,
       { key: 'subtitle', label: 'Subtitle', kind: 'text' },
       ICON_FIELD,
+      { key: 'logoUrl', label: 'Logo URL', kind: 'text', placeholder: 'https://… (overrides the icon)' },
       { key: 'action', label: 'Link action', kind: 'action', actionTypes: QUICK_LINK_ACTION_TYPES },
       COLOR_FIELD,
     ],
@@ -149,6 +166,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
       { key: 'description', label: 'Description', kind: 'textarea' },
       ICON_FIELD,
       { key: 'category', label: 'Category', kind: 'text' },
+      { key: 'imageUrl', label: 'Tile image URL', kind: 'text', placeholder: 'https://…' },
       { key: 'action', label: 'Opens', kind: 'action', actionTypes: RESOURCE_ACTION_TYPES },
       COLOR_FIELD,
     ],
@@ -174,9 +192,9 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
   leadership: {
     label: 'Office Leadership',
     itemNoun: 'leader',
+    // Only the Inspector has the roster, so the list just shows whether the
+    // slot is filled.
     itemTitle: (i) => (str(i, 'workspaceMembershipId') ? 'Leadership member' : 'Unassigned leader'),
-    // A proper roster picker (reading workspace_membership) is a follow-up; for now
-    // the reference is entered as a membership id.
     createItem: (order) =>
       ({
         ...base(order),
@@ -187,7 +205,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
         ...accent(order),
       }) as unknown as OfficePageItem,
     fields: [
-      { key: 'workspaceMembershipId', label: 'Membership ID', kind: 'text', placeholder: 'workspace_membership.id' },
+      { key: 'workspaceMembershipId', label: 'Person', kind: 'membership' },
       { key: 'scheduleLink', label: 'Schedule link', kind: 'text', placeholder: 'https://…' },
       { key: 'showMessageButton', label: 'Show message button', kind: 'boolean' },
       { key: 'showScheduleButton', label: 'Show schedule button', kind: 'boolean' },
@@ -207,7 +225,7 @@ export const SECTION_REGISTRY: Record<OfficePageSectionType, SectionTypeMeta> = 
       { key: 'description', label: 'Description', kind: 'textarea' },
       { key: 'buttonText', label: 'Button text', kind: 'text' },
       { key: 'action', label: 'Button action', kind: 'action', actionTypes: SUPPORT_ACTION_TYPES, actionShowLabel: true },
-      { key: 'assignedMembershipId', label: 'Assigned contact (membership ID)', kind: 'text' },
+      { key: 'assignedMembershipId', label: 'Assigned contact', kind: 'membership' },
       COLOR_FIELD,
     ],
   },

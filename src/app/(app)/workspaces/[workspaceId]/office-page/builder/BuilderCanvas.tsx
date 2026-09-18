@@ -7,7 +7,7 @@ import type { OfficePageContent, OfficePageSection, RowLayout } from '@/lib/offi
 import type { BuilderAction, BuilderSelection } from './builder-reducer';
 import { sectionMeta } from './section-registry';
 import { groupSectionsIntoRows, sectionSpan, rowTemplate, templatePlacement, TemplateStyles, GAP_CSS, ALIGN_CSS, type TemplateCell } from './section-rows';
-import { SectionBlock } from '../OfficePageView';
+import { OfficePageChrome, SectionBlock, type OfficeRenderData } from '../OfficePageView';
 
 /**
  * WYSIWYG builder canvas with responsive rows (v2 Phase 6 port). Sections lay out
@@ -24,11 +24,14 @@ import { SectionBlock } from '../OfficePageView';
  */
 export default function BuilderCanvas({
   content,
+  data,
   selection,
   draggingType,
   dispatch,
 }: {
   content: OfficePageContent;
+  /** The same live data the agent page renders with. */
+  data: OfficeRenderData;
   selection: BuilderSelection;
   draggingType: string | null;
   dispatch: Dispatch<BuilderAction>;
@@ -48,7 +51,7 @@ export default function BuilderCanvas({
                 rowId={row.rowId}
                 sections={row.sections}
                 rowLayout={content.rowLayouts?.[row.rowId]}
-                branding={content.branding}
+                data={data}
                 index={index}
                 columnDragging={lanesActive}
                 selection={selection}
@@ -58,6 +61,11 @@ export default function BuilderCanvas({
             </Fragment>
           ))}
           {provided.placeholder}
+          {/* Not editable here, but shown so the canvas is the whole published
+              page rather than just its editable parts. */}
+          <div className="pointer-events-none mt-2 select-none space-y-6 opacity-90">
+            <OfficePageChrome content={content} data={data} />
+          </div>
         </div>
       )}
     </Droppable>
@@ -96,7 +104,7 @@ function RowBlock({
   rowId,
   sections,
   rowLayout,
-  branding,
+  data,
   index,
   columnDragging,
   selection,
@@ -105,7 +113,7 @@ function RowBlock({
   rowId: string;
   sections: OfficePageSection[];
   rowLayout: RowLayout | undefined;
-  branding: OfficePageContent['branding'];
+  data: OfficeRenderData;
   index: number;
   columnDragging: boolean;
   selection: BuilderSelection;
@@ -176,7 +184,7 @@ function RowBlock({
                     <SectionColumn
                       key={section.key}
                       section={section}
-                      branding={branding}
+                      data={data}
                       index={colIndex}
                       inRow={multi}
                       grow={isTemplate ? 1 : multi ? spans[colIndex] : 1}
@@ -210,7 +218,7 @@ function RowBlock({
 
 function SectionColumn({
   section,
-  branding,
+  data,
   index,
   inRow,
   grow,
@@ -221,7 +229,7 @@ function SectionColumn({
   dispatch,
 }: {
   section: OfficePageSection;
-  branding: OfficePageContent['branding'];
+  data: OfficeRenderData;
   index: number;
   inRow: boolean;
   grow: number;
@@ -271,7 +279,7 @@ function SectionColumn({
 
           {/* The real, published render — passive so canvas clicks select the section. */}
           <div className="pointer-events-none select-none">
-            <SectionBlock section={section} branding={branding} />
+            <SectionBlock section={section} data={data} />
           </div>
 
           {rendersEmpty && (

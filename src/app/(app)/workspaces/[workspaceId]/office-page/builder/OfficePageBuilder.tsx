@@ -15,9 +15,18 @@ import {
   Eye,
   Pencil,
 } from 'lucide-react';
-import type { OfficePageContent, OfficePageSectionType } from '@/lib/office-page-content';
+import type {
+  OfficeBrokerage,
+  OfficeDirectory,
+  OfficeMember,
+  OfficePageContent,
+  OfficePageSectionType,
+} from '@/lib/office-page-content';
 import { OFFICE_PAGE_SECTION_TYPES } from '@/lib/office-page-content';
-import OfficePageView from '../OfficePageView';
+import OfficePageView, {
+  type AgentOfficeVendor,
+  type OfficeRenderData,
+} from '../OfficePageView';
 import BuilderCanvas from './BuilderCanvas';
 import Inspector from './Inspector';
 import { builderReducer, initBuilderState } from './builder-reducer';
@@ -38,10 +47,20 @@ export default function OfficePageBuilder({
   workspaceId,
   initialContent,
   pageStatus,
+  brokerage,
+  directory,
+  roster,
+  activeVendors,
 }: {
   workspaceId: string;
   initialContent: OfficePageContent;
   pageStatus: 'draft' | 'published' | 'archived';
+  /** Resolved server-side. The canvas renders with it, so the edit screen shows
+   *  the same brokerage, people and vendors the published page will. */
+  brokerage: OfficeBrokerage | null;
+  directory: OfficeDirectory;
+  roster: OfficeMember[];
+  activeVendors: AgentOfficeVendor[];
 }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(builderReducer, initialContent, initBuilderState);
@@ -53,6 +72,15 @@ export default function OfficePageBuilder({
   const [draggingType, setDraggingType] = useState<string | null>(null);
 
   const base = `/api/workspaces/${workspaceId}/office-page`;
+
+  // Page chrome follows the draft being edited; the live blocks do not.
+  const renderData: OfficeRenderData = {
+    branding: state.content.branding,
+    footer: state.content.footer,
+    brokerage,
+    directory,
+    activeVendors,
+  };
 
   const onDragStart = useCallback((start: DragStart) => setDraggingType(start.type), []);
 
@@ -249,7 +277,12 @@ export default function OfficePageBuilder({
 
       {preview ? (
         <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6">
-          <OfficePageView content={state.content} />
+          <OfficePageView
+            content={state.content}
+            brokerage={brokerage}
+            directory={directory}
+            activeVendors={activeVendors}
+          />
         </div>
       ) : (
         <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -257,6 +290,7 @@ export default function OfficePageBuilder({
             {/* Canvas */}
             <div>
               <BuilderCanvas
+                data={renderData}
                 content={state.content}
                 selection={state.selection}
                 draggingType={draggingType}
@@ -290,7 +324,12 @@ export default function OfficePageBuilder({
 
             {/* Inspector */}
             <aside className="lg:sticky lg:top-6 h-fit rounded-xl border border-gray-100 bg-white p-4">
-              <Inspector selection={state.selection} content={state.content} dispatch={dispatch} />
+              <Inspector
+                selection={state.selection}
+                content={state.content}
+                roster={roster}
+                dispatch={dispatch}
+              />
             </aside>
           </div>
         </DragDropContext>
