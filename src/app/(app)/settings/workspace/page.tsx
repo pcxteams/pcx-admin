@@ -75,6 +75,10 @@ export interface WorkspaceSettingsProfile {
   access: {
     canView: boolean;
     canManage: boolean;
+    /** Platform role (master / admin / user), null for a pure member. */
+    platformRole: string | null;
+    /** Workspace membership role, null for a platform account with no seat. */
+    membershipRole: 'manager' | 'leader' | 'agent' | null;
   };
 }
 

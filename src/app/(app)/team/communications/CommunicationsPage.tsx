@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Plus, Mail } from 'lucide-react';
 import NewEmailModal from './NewEmailModal';
+import AutomatedEmailTemplates from './AutomatedEmailTemplates';
 import type { EmailSendSummary } from './types';
 
 // Static filter options. There is no offices/teams/agents data model in v3 yet,
@@ -79,8 +80,17 @@ function PillSelect({ options }: { options: string[] }) {
 
 export default function CommunicationsPage({
   initialSends,
+  defaultWorkspaceId,
+  defaultWorkspaceName,
+  isPlatformAdmin,
+  canManageTemplates,
 }: {
   initialSends: EmailSendSummary[];
+  defaultWorkspaceId: string | null;
+  defaultWorkspaceName: string | null;
+  isPlatformAdmin: boolean;
+  /** Resolved on the server: Leaders and Agents never render the section. */
+  canManageTemplates: boolean;
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -193,6 +203,14 @@ export default function CommunicationsPage({
             )}
           </div>
         </div>
+
+        {canManageTemplates && (
+          <AutomatedEmailTemplates
+            defaultWorkspaceId={defaultWorkspaceId}
+            defaultWorkspaceName={defaultWorkspaceName}
+            isPlatformAdmin={isPlatformAdmin}
+          />
+        )}
       </div>
 
       {modalOpen && (
