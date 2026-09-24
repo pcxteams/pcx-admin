@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 import {
   Building2, Users, ExternalLink, Pencil, Trash2, Plus, Check, X, Mail, History,
@@ -129,6 +130,11 @@ export default function WorkspaceSettingsView({
   vendors: ProfileVendor[];
 }) {
   const canManage = data.access.canManage;
+  // Narrower than canManage, which also covers a full Leader (KAN-154).
+  const canManageEmailTemplates =
+    data.access.platformRole === 'master' ||
+    data.access.platformRole === 'admin' ||
+    data.access.membershipRole === 'manager';
   const uid = useId();
 
   const initialForm: FormState = {
@@ -641,18 +647,18 @@ export default function WorkspaceSettingsView({
             <p className="mt-3 text-xs text-gray-400">
               The From address stays on the platform-approved sending domain and can&apos;t be changed here.
             </p>
+            {canManageEmailTemplates && (
             <div className="mt-5 border-t border-gray-100 pt-4">
-              <button
-                type="button"
-                disabled
-                title="Automated email template management is coming soon."
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-400 cursor-not-allowed"
+              <Link
+                href="/team/communications#automated-email-templates"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Mail size={14} />
                 Manage Automated Email Templates
-              </button>
-              <p className="mt-1.5 text-xs text-gray-400">Subject and body editing lives in Automated Email Templates (coming soon).</p>
+              </Link>
+              <p className="mt-1.5 text-xs text-gray-400">Subject and body editing lives on the Communications page, under Automated Email Templates.</p>
             </div>
+            )}
           </div>
 
           {/* Office Resources & Quick Links */}
