@@ -12,7 +12,13 @@ import {
   type MyWorkspaceScope,
   type WorkspaceOption,
 } from '@/lib/workspaces';
-import { createInvitedUser, type CreateUserRole, type OnboardingTypeInput } from '@/lib/users';
+import {
+  createInvitedUser,
+  lookupUserByEmail,
+  type CreateUserRole,
+  type EmailLookupStatus,
+  type OnboardingTypeInput,
+} from '@/lib/users';
 import ProfilePhotoUpload from './ProfilePhotoUpload';
 import AssignedLeaderFields, { type LeaderValue } from './AssignedLeaderFields';
 import VisibilityFields, { type AccessLevel } from './VisibilityFields';
@@ -103,6 +109,15 @@ export default function AddUserForm({
   // 4. Onboarding Type (agent only)
   const [onboardingType, setOnboardingType] = useState<OnboardingTypeInput | ''>('');
 
+  // "Already has an account" check (M12): runs once both the email (on blur)
+  // and the target workspace are known, and again if either changes.
+  const [lookupEmail, setLookupEmail] = useState('');
+  const [emailLookup, setEmailLookup] = useState<{
+    email: string;
+    workspaceId: string;
+    status: EmailLookupStatus;
+    name?: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -231,7 +246,46 @@ export default function AddUserForm({
     ? { href: `/teams/${initialTeamId}`, label: initialTeamLabel || 'Team' }
     : { href: '/users', label: 'Users' };
 
+  useEffect(() => {
+    if (!lookupEmail || !primaryWorkspaceId) return;
+    let cancelled = false;
+    lookupUserByEmail(lookupEmail, primaryWorkspaceId).then((result) => {
+      if (cancelled || !result) return;
+      setEmailLookup({ email: lookupEmail, workspaceId: primaryWorkspaceId, ...result });
+      // An existing account keeps its own name; show it, read-only.
+      if (result.status === 'exists' && result.name) {
+        const [first, ...rest] = result.name.trim().split(/\s+/);
+        setFirstName(first ?? '');
+        setLastName(rest.join(' '));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lookupEmail, primaryWorkspaceId]);
+
+  // Only trust a result for the exact email + workspace currently entered.
+  const lookup =
+    emailLookup &&
+    emailLookup.email === email.trim().toLowerCase() &&
+    emailLookup.workspaceId === primaryWorkspaceId
+      ? emailLookup
+      : null;
+  const existingAccount = lookup?.status === 'exists';
+  const blockedByLookup = lookup?.status === 'member' || lookup?.status === 'platform';
+
+  function handleEmailChange(value: string) {
+    // Leaving an existing account's email unlocks (and clears) the names that
+    // were filled in from it.
+    if (existingAccount) {
+      setFirstName('');
+      setLastName('');
+    }
+    setEmail(value);
+  }
+
   const canSubmit =
+    !blockedByLookup &&
     firstName.trim() !== '' &&
     lastName.trim() !== '' &&
     email.trim() !== '' &&
@@ -307,13 +361,23 @@ export default function AddUserForm({
               <label className={LABEL_CLASS}>
                 First Name <span className="text-red-500">*</span>
               </label>
-              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={INPUT_CLASS} />
+              <input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                readOnly={existingAccount}
+                className={`${INPUT_CLASS}${existingAccount ? ' bg-gray-50 text-gray-500' : ''}`}
+              />
             </div>
             <div>
               <label className={LABEL_CLASS}>
                 Last Name <span className="text-red-500">*</span>
               </label>
-              <input value={lastName} onChange={(e) => setLastName(e.target.value)} className={INPUT_CLASS} />
+              <input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                readOnly={existingAccount}
+                className={`${INPUT_CLASS}${existingAccount ? ' bg-gray-50 text-gray-500' : ''}`}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -321,7 +385,30 @@ export default function AddUserForm({
               <label className={LABEL_CLASS}>
                 Email Address <span className="text-red-500">*</span>
               </label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={INPUT_CLASS} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => handleEmailChange(e.target.value)}
+                onBlur={() => setLookupEmail(email.trim().toLowerCase())}
+                className={INPUT_CLASS}
+              />
+              {lookup?.status === 'exists' && (
+                <p className="mt-1.5 text-xs text-blue-700">
+                  This person already has a PCx account. They&apos;ll be added to{' '}
+                  {primaryWorkspaceLabel || 'this workspace'} and notified. Their name and account details
+                  won&apos;t change.
+                </p>
+              )}
+              {lookup?.status === 'member' && (
+                <p className="mt-1.5 text-xs text-red-600">
+                  {lookup.name || 'This person'} is already a member of {primaryWorkspaceLabel || 'this workspace'}.
+                </p>
+              )}
+              {lookup?.status === 'platform' && (
+                <p className="mt-1.5 text-xs text-red-600">
+                  This email belongs to a PCx platform account and can&apos;t be added to a workspace.
+                </p>
+              )}
             </div>
             <div>
               <label className={LABEL_CLASS}>Mobile Phone</label>

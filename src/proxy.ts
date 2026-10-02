@@ -11,6 +11,9 @@ function isPublic(pathname: string): boolean {
   // Setup form and account activation pages are public — no session required.
   if (pathname.startsWith('/setup/')) return true;
   if (pathname.startsWith('/api/workspace-setup/')) return true;
+  // Workspace Customization (Form 3) is submitted from the same public
+  // /setup/:token page, by someone who has no session yet.
+  if (pathname.startsWith('/api/workspace-customization/')) return true;
   if (pathname.startsWith('/activate/')) return true;
   if (pathname.startsWith('/api/activate/')) return true;
   // Preferred Vendor Submission Form, reached via an emailed token link (KAN-99).
@@ -25,8 +28,17 @@ export function proxy(request: NextRequest) {
   // Inject the pathname so server layouts can read it via headers().
   // Used by (app)/layout.tsx to skip auth for /setup/* if the catch-all
   // route group happens to intercept those public paths.
+  // Always overwritten — including on asset-like paths below — so a client
+  // can never supply its own x-pathname and trip the layout's public-page
+  // bypass.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', pathname);
+
+  // public/ assets (images, robots.txt, manifest.json) must stay reachable
+  // while signed out, so paths with a file extension skip the session check.
+  if (/\.[^/]+$/.test(pathname)) {
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
 
   const hasSession = Boolean(
     request.cookies.get(SESSION_COOKIE)?.value ??
@@ -48,10 +60,9 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except Next internals, the auth API (which must stay
-  // reachable while signed out so sign-in works), and any path containing a
-  // file extension, i.e. public/ assets (images, robots.txt, manifest.json).
-  // Next 16 Proxy runs on those by default and would otherwise redirect them
-  // to /login for logged-out visitors, breaking asset loading.
-  matcher: ['/((?!api/auth|_next/static|_next/image|.*\\..*).*)'],
+  // Run on everything except Next internals and the auth API (which must stay
+  // reachable while signed out so sign-in works). Paths with a file extension
+  // are included so x-pathname is always set by the proxy, never by the
+  // client; the asset check in proxy() keeps them reachable while signed out.
+  matcher: ['/((?!api/auth|_next/static|_next/image).*)'],
 };

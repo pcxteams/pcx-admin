@@ -107,6 +107,31 @@ export async function createInvitedUser(
   }
 }
 
+export type EmailLookupStatus = 'new' | 'exists' | 'member' | 'platform';
+
+/**
+ * What adding this email to `workspaceId` will do (see UsersController.lookup
+ * in pcx-api-v2): `new` — invite a new account; `exists` — they already have
+ * a PCx account and will be added and notified, account unchanged; `member` —
+ * already in this workspace or one of its Teams; `platform` — a PCx platform
+ * account, which can't be added. Returns null on any failure so the form
+ * falls back to its normal behavior; the API still enforces the same rules
+ * on submit.
+ */
+export async function lookupUserByEmail(
+  email: string,
+  workspaceId: string,
+): Promise<{ status: EmailLookupStatus; name?: string } | null> {
+  try {
+    const params = new URLSearchParams({ email, workspaceId });
+    const res = await fetch(`/api/users/lookup?${params}`, { credentials: 'include' });
+    if (!res.ok) return null;
+    return (await res.json()) as { status: EmailLookupStatus; name?: string };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Re-sends the activation email for a not-yet-activated user. Backed by a
  * dedicated endpoint rather than resubmitting the whole Add User form —
