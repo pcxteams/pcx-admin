@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Check, Save } from 'lucide-react';
+import { lookupUserByEmail, type EmailLookupStatus } from '@/lib/users';
 
 const BRAND = '#009689';
 
@@ -89,6 +90,30 @@ export default function LeadershipTeamEditor({
   const nextKey = useRef(initialLeaders.length);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "Already has an account" hints (M12), per row, for rows added here — the
+  // rows that were already on the team are members by definition.
+  const initialEmails = useRef(new Set(initialLeaders.map((l) => l.email.trim().toLowerCase())));
+  const [lookups, setLookups] = useState<
+    Record<string, { email: string; status: EmailLookupStatus; name?: string }>
+  >({});
+
+  async function checkEmail(key: string, rawEmail: string) {
+    const email = rawEmail.trim().toLowerCase();
+    if (!email || initialEmails.current.has(email)) return;
+    const result = await lookupUserByEmail(email, workspaceId);
+    if (!result) return;
+    setLookups((prev) => ({ ...prev, [key]: { email, ...result } }));
+    // An existing account keeps its own name.
+    if (result.status === 'exists' && result.name) {
+      setLeaders((prev) => prev.map((l) => (l._key === key ? { ...l, name: result.name as string } : l)));
+    }
+  }
+
+  /** The lookup for a row, only while it still matches the row's email. */
+  function lookupFor(l: FormLeader) {
+    const hit = lookups[l._key];
+    return hit && hit.email === l.email.trim().toLowerCase() ? hit : null;
+  }
   const [saved, setSaved] = useState(false);
 
   function update(index: number, patch: Partial<FormLeader>) {
@@ -119,6 +144,11 @@ export default function LeadershipTeamEditor({
     for (const [i, l] of leaders.entries()) {
       if (!l.name.trim()) return setError(`Leadership record ${i + 1}: Name is required.`);
       if (!l.email.trim()) return setError(`Leadership record ${i + 1}: Email is required.`);
+      if (lookupFor(l)?.status === 'platform') {
+        return setError(
+          `Leadership record ${i + 1}: this email belongs to a PCx platform account and can't be added to a workspace.`,
+        );
+      }
     }
 
     setIsSaving(true);
@@ -259,11 +289,41 @@ export default function LeadershipTeamEditor({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={LABEL}>Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={leader.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Full name" className={INPUT} />
+                    <input
+                      type="text"
+                      value={leader.name}
+                      onChange={(e) => update(i, { name: e.target.value })}
+                      readOnly={lookupFor(leader)?.status === 'exists'}
+                      placeholder="Full name"
+                      className={`${INPUT}${lookupFor(leader)?.status === 'exists' ? ' bg-gray-50 text-gray-500' : ''}`}
+                    />
                   </div>
                   <div>
                     <label className={LABEL}>Email <span className="text-red-500">*</span></label>
-                    <input type="email" value={leader.email} onChange={(e) => update(i, { email: e.target.value })} placeholder="leader@example.com" className={INPUT} />
+                    <input
+                      type="email"
+                      value={leader.email}
+                      onChange={(e) => update(i, { email: e.target.value })}
+                      onBlur={(e) => checkEmail(leader._key, e.target.value)}
+                      placeholder="leader@example.com"
+                      className={INPUT}
+                    />
+                    {lookupFor(leader)?.status === 'exists' && (
+                      <p className="mt-1 text-xs text-blue-700">
+                        Already has a PCx account. They&apos;ll be added and notified; their name and account details
+                        won&apos;t change.
+                      </p>
+                    )}
+                    {lookupFor(leader)?.status === 'member' && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Already a member of this workspace. Saving gives them this leadership role.
+                      </p>
+                    )}
+                    {lookupFor(leader)?.status === 'platform' && (
+                      <p className="mt-1 text-xs text-red-600">
+                        This email belongs to a PCx platform account and can&apos;t be added to a workspace.
+                      </p>
+                    )}
                   </div>
                 </div>
 
